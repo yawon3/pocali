@@ -1,6 +1,12 @@
-fetch('https://pocali-backend.onrender.com/api/images')
-  .then(res => res.json())
-  .then(data => {
+ fetch('https://pocali-backend.onrender.com/api/images')
+   .then(res => res.json())
+   .then(payload => {
+     // payload 가 { images: [...] } 이면 그 배열을, 
+     // 아니면 payload 자체를 배열로 간주
+     const data = Array.isArray(payload)
+                  ? payload
+                  : (payload.images || []);
+
     const grid = document.getElementById('photo-grid');
     data.forEach(img => {
       const div = document.createElement('div');
@@ -21,5 +27,8 @@ fetch('https://pocali-backend.onrender.com/api/images')
       grid.appendChild(div);
     });
 
-    renderImages(data); // 이 부분도 맨 아래로 이동
+        // 기존 pocalist 스크립트가 사용하는 전역 render() 로 대체
+        if (typeof render === 'function') {
+          render();  
+        }
   });
