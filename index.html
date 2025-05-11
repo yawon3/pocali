@@ -365,7 +365,9 @@
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
             function showByCategory(list) {
             // list: applyFilters에서 넘겨준 필터된 카드 배열
-            const cardsList = Array.isArray(list) ? list : window.originalCards;
+            const filtered = Array.isArray(cardsList)
+                ? cardsList
+                : window.originalCards;
 
             // (1) 그룹핑: category | title | version
             const buckets = {};
@@ -389,7 +391,6 @@
               .forEach(([header, cards]) => {
                 const h2 = document.createElement('h2');
                 h2.textContent  = header;
-                h2.style.margin = '16px 0 8px';
                 $grid.appendChild(h2);
 
                 cards
