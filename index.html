@@ -222,28 +222,46 @@
                     const payload = await res.json();
                     const list    = Array.isArray(payload) ? payload : (payload.images || []);
 
-                    // 1) 기존 그리드 비우기
-                    grid.innerHTML = '';
+                    // 1) 그리드 초기화
+                            grid.innerHTML = '';
 
-                    // 2) 카드 생성 (원래 HTML/CSS 구조에 맞게 innerHTML 쓰시면 됩니다)
+                    // 2) 카드 생성
                     list.forEach(img => {
                       const div = document.createElement('div');
                       div.className = 'photo-card-container';
+                      // 데이터 속성 추가
+                      div.dataset.group = img.group;
+                      div.dataset.member = img.member;
+                      div.dataset.category = img.category;
+                      div.dataset.title = img.title;
+                      div.dataset.version = img.version;
+                      div.dataset.unique = img.unique_id;
+                      // innerHTML에선 img 태그만 포함
                       div.innerHTML = `
-                        <!-- 원래 index.html에 있던 구조 그대로 복사 -->
                         <img class="photo-card" src="${img.url}" alt="${img.filename}">
                         <div class="subcat-label">${img.file_type}</div>
                       `;
                       grid.appendChild(div);
                     });
 
-                    // 3) originalCards 갱신 (기존 필터/정렬/카운트 로직에서 이걸 씁니다)
-                    window.originalCards = Array.from(
-                      grid.querySelectorAll('.photo-card-container')
-                    );
-                  } catch (e) {
-                    console.error('이미지 로딩 실패:', e);
-                  }
+                    // 3) 전역 originalCards 설정
+                    window.originalCards = Array.from(grid.querySelectorAll('.photo-card-container'));
+
+                    // 4) 초기 UI 그리기
+                    if (typeof showById === 'function') showById();
+
+                    // 5) 더블클릭 이벤트 위임
+                    grid.addEventListener('dblclick', e => {
+                      const card = e.target.closest('.photo-card-container');
+                      if (!card) return;
+                      const imgEl = card.querySelector('.photo-card');
+                      if (imgEl && typeof toggleCheck === 'function') toggleCheck(imgEl);
+                    });
+
+                    } catch (err) {
+                    console.error('이미지 로딩 실패:', err);
+                    grid.innerHTML = '<p class="error">이미지를 불러올 수 없습니다.</p>';
+                    }
                   // ────────────────────────────────────────────
 
               // ── ❶ toggleCheck 함수 정의 (최상단)
