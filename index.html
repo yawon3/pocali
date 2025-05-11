@@ -19,35 +19,15 @@
         </header>
   <!-- 카드 그리드 -->        
    
-	<div id="photo-grid">
-    {% for image in images %}
-        <div class="photo-card-container">
-          <img class="photo-card" 
-              src="/static/loadImages.js" 
-              loading="lazy"
-              alt="{{ image.group }} {{ image.member }} {{ image.category }} {{ image.title }} {{ image.version }} {{ image.unique_id }}"
-              data-group="{{ image.group }}"
-              data-member="{{ image.member }}"
-              data-category="{{ image.category }}"
-              data-title="{{ image.title }}"
-              data-version="{{ image.version }}"
-              data-unique="{{ image.unique_id }}">
-          <!-- 오버레이 추가 -->
-          {% if image.type %}
-            <div class="image-overlay">{{ image.type }}</div>
-          {% endif %}
-        </div>
-      {% endfor %}
+	<div id="photo-grid" class="gallery-grid"></div>
   
     </div>
     <!-- 카드 상세 모달 -->
-    <div id="photo-modal" class="modal" style="display: none;">
-     <div class="modal-content">
-      <span id="modal-close" class="close">&times;</span>
-      <img id="modal-image" src="" alt="확대된 포토카드" draggable="false" />
-      <div id="modal-info">
-        <!-- 파일명 파싱 등으로 추후 상세 정보를 표시할 예정 -->
-        </div>
+    <div id="photo-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <span id="modal-close" class="close">&times;</span>
+        <img id="modal-image" src="" alt="확대된 포토카드" draggable="false" />
+        <div id="modal-info"></div>
       </div>
     </div>
     <!-- 유저 데이터 모달 -->
@@ -231,7 +211,41 @@
           /* ───────────────────────────────────────────────
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
-          document.addEventListener('DOMContentLoaded', () => {
+             document.addEventListener('DOMContentLoaded', async () => {
+                  // ────────────────────────────────────────────
+                  // ✅ 동적 이미지 로드 (기존 로직 앞에 삽입)
+                  const API_URL = 'https://pocali-backend.onrender.com/api/images';
+                  const grid    = document.getElementById('photo-grid');
+                  try {
+                    const res     = await fetch(API_URL);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const payload = await res.json();
+                    const list    = Array.isArray(payload) ? payload : (payload.images || []);
+
+                    // 1) 기존 그리드 비우기
+                    grid.innerHTML = '';
+
+                    // 2) 카드 생성 (원래 HTML/CSS 구조에 맞게 innerHTML 쓰시면 됩니다)
+                    list.forEach(img => {
+                      const div = document.createElement('div');
+                      div.className = 'photo-card-container';
+                      div.innerHTML = `
+                        <!-- 원래 index.html에 있던 구조 그대로 복사 -->
+                        <img class="photo-card" src="${img.url}" alt="${img.filename}">
+                        <div class="subcat-label">${img.file_type}</div>
+                      `;
+                      grid.appendChild(div);
+                    });
+
+                    // 3) originalCards 갱신 (기존 필터/정렬/카운트 로직에서 이걸 씁니다)
+                    window.originalCards = Array.from(
+                      grid.querySelectorAll('.photo-card-container')
+                    );
+                  } catch (e) {
+                    console.error('이미지 로딩 실패:', e);
+                  }
+                  // ────────────────────────────────────────────
+
               // ── ❶ toggleCheck 함수 정의 (최상단)
               function toggleCheck(img) {
                 img.classList.toggle('checked');
