@@ -232,59 +232,7 @@
             const $catToggleBtn  = $('#categoryToggleBtn');
             const $searchInput   = $('#search-input');
           
-            const originalCards  = $$('#photo-grid .photo-card-container');
-            const photoCards = document.querySelectorAll('.photo-card');
-            
-           // ── 카드 터치/클릭 & 롱프레스 한 번에 처리 ───────────────────────────
-           const LONG_PRESS     = 500;  // 모달 띄우는 롱프레스 기준
-           const TAP_THRESHOLD  = 200;  // 탭 토글 인식 기준 (ms)
-           const MOVE_THRESHOLD = 10;   // 스크롤 판정 기준 (px)
-          
-           photoCards.forEach(img => {
-             let timer, startX, startY, startTime, moved;
-              // PC: 더블클릭
-              img.addEventListener('dblclick', () => {
-                if (viewOwner !== 'self') return;
-                toggleCheck(img);
-              });
-             // 1) touchstart / mousedown: 시작
-             img.addEventListener('touchstart', e => {
-               if (viewOwner !== 'self') return;
-               const t = e.touches[0];
-               startX    = t.clientX; startY    = t.clientY;
-               startTime = performance.now(); moved = false;
-               // 롱프레스 타이머: 500ms 지나면 모달 열기
-               timer = setTimeout(() => showModal(img), LONG_PRESS);
-             }, { passive: true });
-             img.addEventListener('mousedown', () => {
-               timer = setTimeout(() => showModal(img), LONG_PRESS);
-             });
-          
-             // 2) touchmove / mouseleave: 스크롤 혹은 커서 이동 시 롱프레스 취소
-             img.addEventListener('touchmove',  e => { const t = e.touches[0];
-               if (Math.abs(t.clientX - startX) > MOVE_THRESHOLD ||
-                   Math.abs(t.clientY - startY) > MOVE_THRESHOLD) {
-                 moved = true; clearTimeout(timer);
-               }
-             }, { passive: true });
-             img.addEventListener('mouseleave', () => clearTimeout(timer));
-          
-             // 3) touchend / mouseup: 탭 토글 or 롱프레스 취소
-             img.addEventListener('touchend', e => {
-               clearTimeout(timer);
-               const delta = performance.now() - startTime;
-               // 짧게 탭한 경우만 toggle, 롱프레스는 이미 모달 열림
-               if (!moved && delta < TAP_THRESHOLD && viewOwner === 'self') {
-                 toggleCheck(img);
-                 e.preventDefault();
-               }
-             }, { passive: false });
-             img.addEventListener('mouseup', () => clearTimeout(timer));
-          
-             // 우클릭·롱프레스 메뉴 차단
-             img.addEventListener('contextmenu', e => e.preventDefault());
-           });
-                    
+       
             /* ─────────────────────────────────────────────
                2. 공통 유틸
                ───────────────────────────────────────────── */

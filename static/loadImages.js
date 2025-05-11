@@ -1,5 +1,4 @@
 // static/loadImages.js
-
 (() => {
   const API_URL = 'https://pocali-backend.onrender.com/api/images';
   const grid = document.getElementById('photo-grid');
@@ -11,31 +10,31 @@
         return res.json();
       })
       .then(data => {
-        // { images: [...] } 또는 그냥 [...] 형태 지원
-        const list = Array.isArray(data)
-          ? data
-          : (data.images || []);
-
-        grid.innerHTML = '';  // 비우고 시작
+        const list = Array.isArray(data) ? data : (data.images || []);
+        grid.innerHTML = '';
 
         list.forEach(img => {
           const div = document.createElement('div');
           div.className = 'photo-card-container';
-
           div.innerHTML = `
-            <img 
-              class="photo-card" 
-              src="${img.url}" 
-              alt="${img.filename}"
-            >
+            <img class="photo-card" src="${img.url}" alt="${img.filename}">
             <div class="subcat-label">${img.file_type}</div>
             <div class="overlay-text">${img.filename}</div>
           `;
           grid.appendChild(div);
         });
 
-        // 기존 UI 스크립트 (showById, render 등)을 호출
+        // 기존 UI 초기화 로직 호출
         if (typeof showById === 'function') showById();
+        if (typeof render === 'function') render();
+
+        // 이벤트 위임: 단 한 번만 바인딩
+        grid.addEventListener('dblclick', e => {
+          const card = e.target.closest('.photo-card-container');
+          if (!card) return;
+          card.classList.toggle('checked');
+          if (typeof updateCount === 'function') updateCount();
+        });
       })
       .catch(err => {
         console.error('이미지 로딩 실패:', err);
