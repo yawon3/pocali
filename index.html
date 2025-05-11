@@ -5,7 +5,7 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>pocalist</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
         <!-- 상단 검색창 & 카운터 -->
@@ -18,16 +18,17 @@
           <button id="view-toggle">👥 친구보기</button>  <!-- ← 새 버튼 -->
         </header>
   <!-- 카드 그리드 -->        
-   
 	<div id="photo-grid" class="gallery-grid"></div>
-  
+ 
     </div>
     <!-- 카드 상세 모달 -->
-    <div id="photo-modal" class="modal" style="display:none;">
-      <div class="modal-content">
-        <span id="modal-close" class="close">&times;</span>
-        <img id="modal-image" src="" alt="확대된 포토카드" draggable="false" />
-        <div id="modal-info"></div>
+    <div id="photo-modal" class="modal" style="display: none;">
+     <div class="modal-content">
+      <span id="modal-close" class="close">&times;</span>
+      <img id="modal-image" src="" alt="확대된 포토카드" draggable="false" />
+      <div id="modal-info">
+        <!-- 파일명 파싱 등으로 추후 상세 정보를 표시할 예정 -->
+        </div>
       </div>
     </div>
     <!-- 유저 데이터 모달 -->
@@ -211,58 +212,52 @@
           /* ───────────────────────────────────────────────
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
-             document.addEventListener('DOMContentLoaded', async () => {
-                  // ────────────────────────────────────────────
-                  // ✅ 동적 이미지 로드 (기존 로직 앞에 삽입)
-                  const API_URL = 'https://pocali-backend.onrender.com/api/images';
-                  const grid    = document.getElementById('photo-grid');
-                  try {
-                    const res     = await fetch(API_URL);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const payload = await res.json();
-                    const list    = Array.isArray(payload) ? payload : (payload.images || []);
+          document.addEventListener('DOMContentLoaded', async () => {
+                // ────────────────────────────────────────────
+                // 동적 이미지 로드 (API → 그리드)
+                const API_URL = '/api/images';
+                const grid    = document.getElementById('photo-grid');
+                try {
+                  const res     = await fetch(API_URL);
+                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                  const payload = await res.json();
+                  // 응답이 { images: […] } 또는 [… ] 일 수 있으므로 처리
+                  const list    = Array.isArray(payload)
+                                  ? payload
+                                  : (payload.images || []);
 
-                    // 1) 그리드 초기화
-                            grid.innerHTML = '';
+                  // 1) 그리드 비우기
+                  grid.innerHTML = '';
 
-                    // 2) 카드 생성
-                    list.forEach(img => {
-                      const div = document.createElement('div');
-                      div.className = 'photo-card-container';
-                      // 데이터 속성 추가
-                      div.dataset.group = img.group;
-                      div.dataset.member = img.member;
-                      div.dataset.category = img.category;
-                      div.dataset.title = img.title;
-                      div.dataset.version = img.version;
-                      div.dataset.unique = img.unique_id;
-                      // innerHTML에선 img 태그만 포함
-                      div.innerHTML = `
-                        <img class="photo-card" src="${img.url}" alt="${img.filename}">
-                        <div class="subcat-label">${img.file_type}</div>
-                      `;
-                      grid.appendChild(div);
-                    });
+                  // 2) 카드 동적 생성 (원본 속성 그대로 살립니다)
+                  list.forEach(img => {
+                    const div = document.createElement('div');
+                    div.className = 'photo-card-container';
+                    div.innerHTML = `
+                      <img class="photo-card"
+                          src="${img.url}"
+                          loading="lazy"
+                          alt="${img.group} ${img.member} ${img.category} ${img.title} ${img.version} ${img.unique_id}"
+                          data-group="${img.group}"
+                          data-member="${img.member}"
+                          data-category="${img.category}"
+                          data-title="${img.title}"
+                          data-version="${img.version}"
+                          data-unique="${img.unique_id}">
+                      ${img.type ? `<div class="image-overlay">${img.type}</div>` : ''}
+                    `;
+                    grid.appendChild(div);
+                  });
 
-                    // 3) 전역 originalCards 설정
-                    window.originalCards = Array.from(grid.querySelectorAll('.photo-card-container'));
+                  // 3) originalCards 갱신 (기존 필터·정렬·카운트 로직에서 사용)
+                  window.originalCards = Array.from(
+                    grid.querySelectorAll('.photo-card-container')
+                  );
+                } catch (e) {
+                  console.error('이미지 로딩 실패:', e);
+                }
+                // ────────────────────────────────────────────
 
-                    // 4) 초기 UI 그리기
-                    if (typeof showById === 'function') showById();
-
-                    // 5) 더블클릭 이벤트 위임
-                    grid.addEventListener('dblclick', e => {
-                      const card = e.target.closest('.photo-card-container');
-                      if (!card) return;
-                      const imgEl = card.querySelector('.photo-card');
-                      if (imgEl && typeof toggleCheck === 'function') toggleCheck(imgEl);
-                    });
-
-                    } catch (err) {
-                    console.error('이미지 로딩 실패:', err);
-                    grid.innerHTML = '<p class="error">이미지를 불러올 수 없습니다.</p>';
-                    }
-                  // ────────────────────────────────────────────
 
               // ── ❶ toggleCheck 함수 정의 (최상단)
               function toggleCheck(img) {
@@ -278,7 +273,8 @@
             const $viewToggleBtn = $('#view-toggle');
             const $catToggleBtn  = $('#categoryToggleBtn');
             const $searchInput   = $('#search-input');
-        
+          
+            const originalCards  = $$('#photo-grid .photo-card-container');
             const photoCards = document.querySelectorAll('.photo-card');
             
            // ── 카드 터치/클릭 & 롱프레스 한 번에 처리 ───────────────────────────
@@ -363,46 +359,58 @@
             }
           
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
-            function showByCategory(list) {
-            // list: applyFilters에서 넘겨준 필터된 카드 배열
-            const filtered = Array.isArray(cardsList)
-                ? cardsList
-                : window.originalCards;
-
-            // (1) 그룹핑: category | title | version
-            const buckets = {};
-            cardsList.forEach(div => {
-              const img = $('.photo-card', div);
-              const key = [
-                img.dataset.category || '미분류',
-                img.dataset.title    || '',
-                img.dataset.version  || ''
-              ].filter(Boolean).join(' | ');
-              (buckets[key] = buckets[key] || []).push(div);
-            });
-
-            // (2) 헤더 + 카드 렌더링
-            $grid.innerHTML = '';
-            Object.entries(buckets)
-              .sort(([,a],[,b]) =>
-                +$('.photo-card', b[0]).dataset.unique -
-                +$('.photo-card', a[0]).dataset.unique
-              )
-              .forEach(([header, cards]) => {
-                const h2 = document.createElement('h2');
-                h2.textContent  = header;
-                $grid.appendChild(h2);
-
-                cards
-                  .sort((a, b) =>
-                    +$('.photo-card', b[0]).dataset.unique -
-                    +$('.photo-card', a[0]).dataset.unique
-                  )
-                  .forEach(div => $grid.appendChild(div));
+            function showByCategory () {
+              const query = ($searchInput.value || '').toLowerCase();
+          
+              /* (1) 필터링 */
+              const filtered = originalCards.filter(div => {
+                const img    = $('.photo-card', div);
+                const alt    = img.alt.toLowerCase();
+                const group  = img.dataset.group.toLowerCase();
+                const member = img.dataset.member.toLowerCase();
+          
+                const textOK   = !query || alt.includes(query);
+                const groupOK  = !advancedFilters.groups.length ||
+                                 advancedFilters.groups.includes(group.toUpperCase());
+                const memberOK = !advancedFilters.members.length ||
+                                 advancedFilters.members.some(v => member.includes(v.toLowerCase()));
+          
+                return textOK && groupOK && memberOK;
               });
-
-            updateCount();
-          }
+          
+              /* (2) 그룹핑 ( category | title | version )*/
+              const buckets = {};
+              filtered.forEach(div => {
+                const img  = $('.photo-card', div);
+                const key  = [
+                  img.dataset.category || '미분류',
+                  img.dataset.title    || '',
+                  img.dataset.version  || ''
+                ].filter(Boolean).join(' | ');
+                (buckets[key] = buckets[key] || []).push(div);
+              });
+          
+              /* (3) 헤더 + 카드 렌더링 */
+              $grid.innerHTML = '';
+              Object.entries(buckets)
+                .sort(([,a],[,b]) =>
+                  +$('.photo-card', b[0]).dataset.unique -
+                  +$('.photo-card', a[0]).dataset.unique
+                )
+                .forEach(([header, cards]) => {
+                  const h2 = document.createElement('h2');
+                  h2.textContent   = header;
+                  h2.style.margin  = '16px 0 8px';
+                  $grid.appendChild(h2);
+          
+                  cards.sort((a, b) =>
+                    +$('.photo-card', b).dataset.unique -
+                    +$('.photo-card', a).dataset.unique
+                  ).forEach(div => $grid.appendChild(div));
+                });
+          
+              updateCount();
+            }
           
             /** 현재 필터/뷰 상태로 다시 그리기 */
             function applyFilters () {
