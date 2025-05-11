@@ -18,11 +18,13 @@
           <button id="view-toggle">👥 친구보기</button>  <!-- ← 새 버튼 -->
         </header>
   <!-- 카드 그리드 -->        
-	<div id="photo-grid"></div>
-    <!-- API로 이미지 불러오는 스크립트 -->
+	  <!-- 여기에 API로 받아온 카드들이 모두 들어갑니다 -->
+    <div id="photo-grid" class="gallery-grid"></div>
+
+    <!-- 동적 로딩 스크립트 -->
     <script src="/static/loadImages.js"></script>
-  
-    </div>
+    <!-- 기존의 showById, render 등 UI 제어 스크립트 -->
+    <script src="/static/main.js"></script>
     <!-- 카드 상세 모달 -->
     <div id="photo-modal" class="modal" style="display: none;">
      <div class="modal-content">

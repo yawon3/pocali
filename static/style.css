@@ -10,6 +10,44 @@ button, a {
   touch-action: manipulation;
 }
 
+/* style.css */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.photo-card-container {
+  position: relative;
+  overflow: hidden;
+}
+.photo-card {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+.subcat-label {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+.overlay-text {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(255,255,255,0.8);
+  color: #333;
+  padding: 2px 4px;
+  font-size: 10px;
+  border-radius: 4px;
+}
+
 /* 모바일: 최대 그리드 너비 320px, 4열 */
 @media (max-width: 767px) {
   #photo-grid {
