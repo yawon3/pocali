@@ -278,8 +278,7 @@
             const $viewToggleBtn = $('#view-toggle');
             const $catToggleBtn  = $('#categoryToggleBtn');
             const $searchInput   = $('#search-input');
-          
-            const originalCards  = $$('#photo-grid .photo-card-container');
+        
             const photoCards = document.querySelectorAll('.photo-card');
             
            // ── 카드 터치/클릭 & 롱프레스 한 번에 처리 ───────────────────────────
@@ -364,58 +363,45 @@
             }
           
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
-            function showByCategory () {
-              const query = ($searchInput.value || '').toLowerCase();
-          
-              /* (1) 필터링 */
-              const filtered = originalCards.filter(div => {
-                const img    = $('.photo-card', div);
-                const alt    = img.alt.toLowerCase();
-                const group  = img.dataset.group.toLowerCase();
-                const member = img.dataset.member.toLowerCase();
-          
-                const textOK   = !query || alt.includes(query);
-                const groupOK  = !advancedFilters.groups.length ||
-                                 advancedFilters.groups.includes(group.toUpperCase());
-                const memberOK = !advancedFilters.members.length ||
-                                 advancedFilters.members.some(v => member.includes(v.toLowerCase()));
-          
-                return textOK && groupOK && memberOK;
+            function showByCategory(list) {
+            // list: applyFilters에서 넘겨준 필터된 카드 배열
+            const cardsList = Array.isArray(list) ? list : window.originalCards;
+
+            // (1) 그룹핑: category | title | version
+            const buckets = {};
+            cardsList.forEach(div => {
+              const img = $('.photo-card', div);
+              const key = [
+                img.dataset.category || '미분류',
+                img.dataset.title    || '',
+                img.dataset.version  || ''
+              ].filter(Boolean).join(' | ');
+              (buckets[key] = buckets[key] || []).push(div);
+            });
+
+            // (2) 헤더 + 카드 렌더링
+            $grid.innerHTML = '';
+            Object.entries(buckets)
+              .sort(([,a],[,b]) =>
+                +$('.photo-card', b[0]).dataset.unique -
+                +$('.photo-card', a[0]).dataset.unique
+              )
+              .forEach(([header, cards]) => {
+                const h2 = document.createElement('h2');
+                h2.textContent  = header;
+                h2.style.margin = '16px 0 8px';
+                $grid.appendChild(h2);
+
+                cards
+                  .sort((a, b) =>
+                    +$('.photo-card', b[0]).dataset.unique -
+                    +$('.photo-card', a[0]).dataset.unique
+                  )
+                  .forEach(div => $grid.appendChild(div));
               });
-          
-              /* (2) 그룹핑 ( category | title | version )*/
-              const buckets = {};
-              filtered.forEach(div => {
-                const img  = $('.photo-card', div);
-                const key  = [
-                  img.dataset.category || '미분류',
-                  img.dataset.title    || '',
-                  img.dataset.version  || ''
-                ].filter(Boolean).join(' | ');
-                (buckets[key] = buckets[key] || []).push(div);
-              });
-          
-              /* (3) 헤더 + 카드 렌더링 */
-              $grid.innerHTML = '';
-              Object.entries(buckets)
-                .sort(([,a],[,b]) =>
-                  +$('.photo-card', b[0]).dataset.unique -
-                  +$('.photo-card', a[0]).dataset.unique
-                )
-                .forEach(([header, cards]) => {
-                  const h2 = document.createElement('h2');
-                  h2.textContent   = header;
-                  h2.style.margin  = '16px 0 8px';
-                  $grid.appendChild(h2);
-          
-                  cards.sort((a, b) =>
-                    +$('.photo-card', b).dataset.unique -
-                    +$('.photo-card', a).dataset.unique
-                  ).forEach(div => $grid.appendChild(div));
-                });
-          
-              updateCount();
-            }
+
+            updateCount();
+          }
           
             /** 현재 필터/뷰 상태로 다시 그리기 */
             function applyFilters () {
