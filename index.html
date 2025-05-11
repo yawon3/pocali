@@ -23,8 +23,8 @@
 
     <!-- 동적 로딩 스크립트 -->
     <script src="/static/loadImages.js"></script>
-    <!-- 기존의 showById, render 등 UI 제어 스크립트 -->
-    <script src="/static/main.js"></script>
+
+
     <!-- 카드 상세 모달 -->
     <div id="photo-modal" class="modal" style="display: none;">
      <div class="modal-content">
@@ -226,12 +226,8 @@
                 syncLocalDataToServer();
                 updateCount();
               }
-            /* 1-1. 반복해서 쓰일 DOM 캐시 */
-            const $grid          = $('#photo-grid');
-            const $viewToggleBtn = $('#view-toggle');
-            const $catToggleBtn  = $('#categoryToggleBtn');
-            const $searchInput   = $('#search-input');
-          
+
+
        
             /* ─────────────────────────────────────────────
                2. 공통 유틸
