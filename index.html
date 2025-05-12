@@ -226,7 +226,6 @@
         async function fetchAndRenderImages() {
             const res    = await fetch('https://pocali-backend.onrender.com/api/images');
             const images = await res.json();
-
             const grid = $('#photo-grid');
             grid.innerHTML = '';
 
@@ -257,14 +256,41 @@
               }
               grid.appendChild(container);
 
-                  // 🔗 생성 즉시 이벤트 바인딩
+                   // ← 여기가 이벤트 붙이는 “유일한” 곳
+                  // PC: 더블클릭 → 체크 토글
                   img.addEventListener('dblclick', () => {
                     if (viewOwner !== 'self') return;
                     toggleCheck(img);
                   });
-                  img.addEventListener('click', () => showModal(img));
+
+                  // 터치: 롱프레스 모달 / 탭 토글
+                  let timer, startX, startY, startTime, moved;
+                  img.addEventListener('touchstart', e => {
+                    if (viewOwner !== 'self') return;
+                    const t = e.touches[0];
+                    startX = t.clientX; startY = t.clientY;
+                    startTime = performance.now(); moved = false;
+                    timer = setTimeout(() => showModal(img), LONG_PRESS);
+                  }, { passive: true });
+                  img.addEventListener('touchmove', e => {
+                    const t = e.touches[0];
+                    if (Math.abs(t.clientX - startX) > MOVE_THRESHOLD ||
+                        Math.abs(t.clientY - startY) > MOVE_THRESHOLD) {
+                      moved = true; clearTimeout(timer);
+                    }
+                  }, { passive: true });
+                  img.addEventListener('touchend', e => {
+                    clearTimeout(timer);
+                    const delta = performance.now() - startTime;
+                    if (!moved && delta < TAP_THRESHOLD && viewOwner === 'self') {
+                      toggleCheck(img);
+                      e.preventDefault();
+                    }
+                  }, { passive: false });
+
+                  // 우클릭 차단
                   img.addEventListener('contextmenu', e => e.preventDefault());
-                  // (터치 롱프레스 로직도 마찬가지로 여기서 바인딩)
+
 
             });
                   
@@ -309,62 +335,6 @@
             .catch(console.error);
        
 
-
-
-           // ── 카드 터치/클릭 & 롱프레스 한 번에 처리 ───────────────────────────
-           const LONG_PRESS     = 500;  // 모달 띄우는 롱프레스 기준
-           const TAP_THRESHOLD  = 200;  // 탭 토글 인식 기준 (ms)
-           const MOVE_THRESHOLD = 10;   // 스크롤 판정 기준 (px)
-          
-
-
-
-
-           
-           photoCards.forEach(img => {
-             let timer, startX, startY, startTime, moved;
-              // PC: 더블클릭
-              img.addEventListener('dblclick', () => {
-                if (viewOwner !== 'self') return;
-                toggleCheck(img);
-              });
-             // 1) touchstart / mousedown: 시작
-             img.addEventListener('touchstart', e => {
-               if (viewOwner !== 'self') return;
-               const t = e.touches[0];
-               startX    = t.clientX; startY    = t.clientY;
-               startTime = performance.now(); moved = false;
-               // 롱프레스 타이머: 500ms 지나면 모달 열기
-               timer = setTimeout(() => showModal(img), LONG_PRESS);
-             }, { passive: true });
-             img.addEventListener('mousedown', () => {
-               timer = setTimeout(() => showModal(img), LONG_PRESS);
-             });
-          
-             // 2) touchmove / mouseleave: 스크롤 혹은 커서 이동 시 롱프레스 취소
-             img.addEventListener('touchmove',  e => { const t = e.touches[0];
-               if (Math.abs(t.clientX - startX) > MOVE_THRESHOLD ||
-                   Math.abs(t.clientY - startY) > MOVE_THRESHOLD) {
-                 moved = true; clearTimeout(timer);
-               }
-             }, { passive: true });
-             img.addEventListener('mouseleave', () => clearTimeout(timer));
-          
-             // 3) touchend / mouseup: 탭 토글 or 롱프레스 취소
-             img.addEventListener('touchend', e => {
-               clearTimeout(timer);
-               const delta = performance.now() - startTime;
-               // 짧게 탭한 경우만 toggle, 롱프레스는 이미 모달 열림
-               if (!moved && delta < TAP_THRESHOLD && viewOwner === 'self') {
-                 toggleCheck(img);
-                 e.preventDefault();
-               }
-             }, { passive: false });
-             img.addEventListener('mouseup', () => clearTimeout(timer));
-          
-             // 우클릭·롱프레스 메뉴 차단
-             img.addEventListener('contextmenu', e => e.preventDefault());
-           });
                     
             /* ─────────────────────────────────────────────
                2. 공통 유틸
