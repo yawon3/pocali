@@ -270,41 +270,29 @@
               }
               $grid.appendChild(container);
 
-                   // ← 여기가 이벤트 붙이는 “유일한” 곳
-                  // PC: 더블클릭 → 체크 토글
-                  img.addEventListener('dblclick', () => {
-                    if (viewOwner !== 'self') return;
-                    toggleCheck(img);
-                  });
-
-                  // 터치: 롱프레스 모달 / 탭 토글
-                  let timer, startX, startY, startTime, moved;
-                  img.addEventListener('touchstart', e => {
-                    if (viewOwner !== 'self') return;
-                    const t = e.touches[0];
-                    startX = t.clientX; startY = t.clientY;
-                    startTime = performance.now(); moved = false;
-                    timer = setTimeout(() => showModal(img), LONG_PRESS);
-                  }, { passive: true });
-                  img.addEventListener('touchmove', e => {
-                    const t = e.touches[0];
-                    if (Math.abs(t.clientX - startX) > MOVE_THRESHOLD ||
-                        Math.abs(t.clientY - startY) > MOVE_THRESHOLD) {
-                      moved = true; clearTimeout(timer);
-                    }
-                  }, { passive: true });
-                  img.addEventListener('touchend', e => {
-                    clearTimeout(timer);
-                    const delta = performance.now() - startTime;
-                    if (!moved && delta < TAP_THRESHOLD && viewOwner === 'self') {
-                      toggleCheck(img);
-                      e.preventDefault();
-                    }
-                  }, { passive: false });
-
-                  // 우클릭 차단
-                  img.addEventListener('contextmenu', e => e.preventDefault());
-
+                   // ➊ 더블클릭 → 보유 토글
+                   img.addEventListener('dblclick', () => {
+                     if (viewOwner !== 'self') return;
+                     toggleCheck(img);
+                   });
+             
+                   // ➋ 단일 클릭 → 상세 모달
+                   img.addEventListener('click', () => showModal(img));
+             
+                   // ➌ 롱프레스 (desktop & mobile) → 500ms 후 상세 모달
+                   let pressTimer;
+                   img.addEventListener('pointerdown', () => {
+                     if (viewOwner !== 'self') return;
+                     pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+                   });
+                   img.addEventListener('pointerup', () => clearTimeout(pressTimer));
+                   img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+             
+                   // ➍ 우클릭 또는 모바일 롱프레스 기본메뉴 차단 & 모달 띄우기
+                   img.addEventListener('contextmenu', e => {
+                     e.preventDefault();
+                     showModal(img);
+                   });   
 
             });
                   
@@ -314,15 +302,7 @@
 
       
           }
-          $catToggleBtn.addEventListener('click', () => {
-            currentView = currentView === 'id' ? 'category' : 'id';
-            $catToggleBtn.textContent = currentView === 'id' ? '🏷️' : '🔢';
-            $catToggleBtn.title = currentView === 'id'
-              ? '카테고리별 보기'
-              : '고유번호 순 보기';
-            applyFilters();
-          });
-
+          
           $searchInput.addEventListener('input', applyFilters);
 
           $viewToggleBtn.addEventListener('click', () => {
