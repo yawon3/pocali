@@ -212,27 +212,16 @@
           /* ───────────────────────────────────────────────
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
-          document.addEventListener('DOMContentLoaded', () => {
-               fetchAndRenderImages();
-              // ── ❶ toggleCheck 함수 정의 (최상단)
-              function toggleCheck(img) {
-                img.classList.toggle('checked');
-                const data = JSON.parse(localStorage.getItem('userData') || '{}');
-                data[img.dataset.unique] = img.classList.contains('checked');
-                localStorage.setItem('userData', JSON.stringify(data));
-                syncLocalDataToServer();
-                updateCount();
-              }
-
-              
-            /* 1-1. 반복해서 쓰일 DOM 캐시 */
-            const $grid          = $('#photo-grid');
-            const $viewToggleBtn = $('#view-toggle');
-            const $catToggleBtn  = $('#categoryToggleBtn');
-            const $searchInput   = $('#search-input');
+           document.addEventListener('DOMContentLoaded', () => {
+             // 0. 렌더링 후에 값을 채울 변수들은 let 으로
+             let originalCards = [];
+             let photoCards    = [];
           
-            const originalCards  = $$('#photo-grid .photo-card-container');
-            const photoCards = document.querySelectorAll('.photo-card');
+             // ── ❶ toggleCheck 함수 정의 ...
+             const $grid          = $('#photo-grid');
+             const $viewToggleBtn = $('#view-toggle');
+             const $catToggleBtn  = $('#categoryToggleBtn');
+             const $searchInput   = $('#search-input');
             
         async function fetchAndRenderImages() {
             const res    = await fetch('https://pocali-backend.onrender.com/api/images');
@@ -267,8 +256,18 @@
                 container.appendChild(overlay);
               }
               grid.appendChild(container);
-            });
 
+                  // 🔗 생성 즉시 이벤트 바인딩
+                  img.addEventListener('dblclick', () => {
+                    if (viewOwner !== 'self') return;
+                    toggleCheck(img);
+                  });
+                  img.addEventListener('click', () => showModal(img));
+                  img.addEventListener('contextmenu', e => e.preventDefault());
+                  // (터치 롱프레스 로직도 마찬가지로 여기서 바인딩)
+
+            });
+                  
             // ① 렌더링된 이미지 캐시 갱신
             originalCards = Array.from($$('#photo-grid .photo-card-container'));
             photoCards    = Array.from($$('.photo-card'));
