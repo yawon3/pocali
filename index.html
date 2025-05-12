@@ -217,7 +217,14 @@
             const TAP_THRESHOLD  = 200;
             const MOVE_THRESHOLD = 10;
 
-            function toggleCheck(img) { /* 위 정의 그대로 */ }
+             function toggleCheck(img) {
+               img.classList.toggle('checked');
+               const data = JSON.parse(localStorage.getItem('userData') || '{}');
+               data[img.dataset.unique] = img.classList.contains('checked');
+               localStorage.setItem('userData', JSON.stringify(data));
+               syncLocalDataToServer();
+               updateCount();
+             }
             // ── ❶ toggleCheck 함수 정의 ...
              const $grid          = $('#photo-grid');
              const $viewToggleBtn = $('#view-toggle');
@@ -303,37 +310,33 @@
             originalCards = Array.from($$('#photo-grid .photo-card-container'));
             photoCards    = Array.from($$('.photo-card'));
 
-             // 카테고리뷰, 검색, 친구 보기 토글 바인딩…
-            $catToggleBtn.addEventListener('click', () => {
-              currentView = currentView === 'id' ? 'category' : 'id';
-              applyFilters();
-            });
-            $searchInput.addEventListener('input', applyFilters);
-            $viewToggleBtn.addEventListener('click', /* … */);
-
-            // 이미지 불러오기 + 초기 뷰 적용
-            fetchAndRenderImages()
-              .then(() => {
-                showById();
-                loadSelfDeck();
-                updateCount();
-              })
-              .catch(console.error);
-
-            // ② 이미지별 이벤트 바인딩
-            photoCards.forEach(img => {
-              // 더블클릭 → 보유체크 토글
-              img.addEventListener('dblclick', () => {
-                if (viewOwner !== 'self') return;
-                toggleCheck(img);
-              });
-              // 클릭 → 상세 모달
-              img.addEventListener('click', () => showModal(img));
-              img.addEventListener('contextmenu', e => e.preventDefault());
-
-            });
+      
           }
+          $catToggleBtn.addEventListener('click', () => {
+            currentView = currentView === 'id' ? 'category' : 'id';
+            $catToggleBtn.textContent = currentView === 'id' ? '🏷️' : '🔢';
+            $catToggleBtn.title = currentView === 'id'
+              ? '카테고리별 보기'
+              : '고유번호 순 보기';
+            applyFilters();
+          });
 
+          $searchInput.addEventListener('input', applyFilters);
+
+          $viewToggleBtn.addEventListener('click', () => {
+            if (viewOwner === 'friend') loadSelfDeck();
+            else if (currentFriendUUID) loadFriendDeck(currentFriendUUID);
+            else alert('먼저 친구를 추가하세요!');
+          });
+
+          // 이제야 한 번만 이미지를 불러옵니다.
+          fetchAndRenderImages()
+            .then(() => {
+              showById();
+              loadSelfDeck();
+              updateCount();
+            })
+            .catch(console.error);
    
 
                     
