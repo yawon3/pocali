@@ -213,6 +213,8 @@
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
            document.addEventListener('DOMContentLoaded', () => {
+            let page = 0;
+            const PAGE_SIZE = 50;
             const LONG_PRESS     = 500;
             const TAP_THRESHOLD  = 200;
             const MOVE_THRESHOLD = 10;
@@ -238,10 +240,17 @@
              
             
         async function fetchAndRenderImages() {
-           const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
-           // 로컬 grid 변수 선언
+            // 페이지네이션 파라미터 전달
+            const res = await fetch(
+              `https://pocali-backend.onrender.com/api/images?page=${page}&limit=${PAGE_SIZE}`
+            );
+            const images = await res.json();
+          
+            // 0페이지(최초)일 때만 그리드 초기화
+            if (page === 0) {// 로컬 grid 변수 선언
            const grid = document.getElementById('photo-grid');
            $grid.innerHTML = '';
+            }
 
             images.forEach(image => {
               const container = document.createElement('div');
@@ -306,7 +315,8 @@
             // ① 렌더링된 이미지 캐시 갱신
           originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
           photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
-
+            // 다음 페이지 준비
+            page += 1;
       
           }
           
@@ -326,7 +336,22 @@
               updateCount();
             })
             .catch(console.error);
-   
+            // 무한스크롤: 화면 바닥 근처로 내려가면 다음 페이지 불러오기
+            window.addEventListener('scroll', () => {
+              // 스크롤 위치가 바닥에서 200px 안쪽으로 들어오면
+              if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+                // 한 번만 중복 호출 방지
+                if (!fetchingNext) {
+                  fetchingNext = true;
+                  fetchAndRenderImages()
+                    .then(() => { updateCount(); fetchingNext = false; })
+                    .catch(err => { console.error(err); fetchingNext = false; });
+                }
+              }
+            });
+
+            // 중복 호출 플래그
+            let fetchingNext = false;
 
                     
             /* ─────────────────────────────────────────────
