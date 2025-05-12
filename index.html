@@ -209,7 +209,8 @@
 
           async function fetchAndRenderImages() {
             const res = await fetch('https://pocali-backend.onrender.com/api/images');
-            const images = await res.json();
+            const data = await res.json();
+            const images = Array.isArray(data) ? data : data.images;
 
             const grid = document.getElementById('photo-grid');
             grid.innerHTML = '';
