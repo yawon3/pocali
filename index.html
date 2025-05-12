@@ -238,8 +238,10 @@
              
             
         async function fetchAndRenderImages() {
-            const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
-             $grid.innerHTML = '';
+           const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+           // 로컬 grid 변수 선언
+           const grid = document.getElementById('photo-grid');
+           $grid.innerHTML = '';
 
             images.forEach(image => {
               const container = document.createElement('div');
@@ -266,7 +268,7 @@
                 overlay.textContent = image.type;
                 container.appendChild(overlay);
               }
-              grid.appendChild(container);
+              $grid.appendChild(container);
 
                    // ← 여기가 이벤트 붙이는 “유일한” 곳
                   // PC: 더블클릭 → 체크 토글
@@ -307,8 +309,8 @@
             });
                   
             // ① 렌더링된 이미지 캐시 갱신
-            originalCards = Array.from($$('#photo-grid .photo-card-container'));
-            photoCards    = Array.from($$('.photo-card'));
+          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+          photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
 
       
           }
