@@ -270,29 +270,36 @@
               }
               $grid.appendChild(container);
 
-                   // ➊ 더블클릭 → 보유 토글
-                   img.addEventListener('dblclick', () => {
-                     if (viewOwner !== 'self') return;
-                     toggleCheck(img);
-                   });
-             
-                   // ➋ 단일 클릭 → 상세 모달
-                   img.addEventListener('click', () => showModal(img));
-             
-                   // ➌ 롱프레스 (desktop & mobile) → 500ms 후 상세 모달
-                   let pressTimer;
-                   img.addEventListener('pointerdown', () => {
-                     if (viewOwner !== 'self') return;
-                     pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-                   });
-                   img.addEventListener('pointerup', () => clearTimeout(pressTimer));
-                   img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
-             
-                   // ➍ 우클릭 또는 모바일 롱프레스 기본메뉴 차단 & 모달 띄우기
-                   img.addEventListener('contextmenu', e => {
-                     e.preventDefault();
-                     showModal(img);
-                   });   
+                    // ── 이미지별 이벤트 바인딩 (PC+모바일 모두)
+                let startTime, pressTimer;
+                img.addEventListener('pointerdown', e => {
+                  if (viewOwner !== 'self') return;
+                  startTime = performance.now();
+                  // 500ms 후에만 모달 띄우기
+                  pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+                });
+                img.addEventListener('pointerup', e => {
+                  clearTimeout(pressTimer);
+                  const delta = performance.now() - startTime;
+                  // 터치로 짧게 누르면 보유체크
+                  if (e.pointerType === 'touch' && delta < TAP_THRESHOLD) {
+                    toggleCheck(img);
+                  }
+                });
+                img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+                // PC에서 더블클릭으로 보유체크
+                img.addEventListener('dblclick', () => {
+                  if (viewOwner !== 'self') return;
+                  toggleCheck(img);
+                });
+
+                // 우클릭(또는 모바일 롱프레스) 메뉴 차단 & 모달
+                img.addEventListener('contextmenu', e => {
+                  e.preventDefault();
+                  showModal(img);
+                });
+
 
             });
                   
