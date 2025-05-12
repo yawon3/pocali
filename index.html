@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>pocali</title>
+  <title>pocalist</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -22,7 +22,7 @@
     {% for image in images %}
         <div class="photo-card-container">
           <img class="photo-card" 
-              src="https://pocali-backend.onrender.com/api/images" 
+              src="{{ image.url }}" 
               loading="lazy"
               alt="{{ image.group }} {{ image.member }} {{ image.category }} {{ image.title }} {{ image.version }} {{ image.unique_id }}"
               data-group="{{ image.group }}"
@@ -230,8 +230,7 @@
           /* ───────────────────────────────────────────────
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
-          document.addEventListener('DOMContentLoaded', async () => {
-          const API_URL = '/api/images';
+          document.addEventListener('DOMContentLoaded', () => {
               // ── ❶ toggleCheck 함수 정의 (최상단)
               function toggleCheck(img) {
                 img.classList.toggle('checked');
