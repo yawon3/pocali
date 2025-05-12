@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>pocalist</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>pocali</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
         <!-- 상단 검색창 & 카운터 -->
@@ -18,8 +18,26 @@
           <button id="view-toggle">👥 친구보기</button>  <!-- ← 새 버튼 -->
         </header>
   <!-- 카드 그리드 -->        
-	<div id="photo-grid" class="gallery-grid"></div>
- 
+	<div id="photo-grid">
+    {% for image in images %}
+        <div class="photo-card-container">
+          <img class="photo-card" 
+              src="https://pocali-backend.onrender.com/api/images" 
+              loading="lazy"
+              alt="{{ image.group }} {{ image.member }} {{ image.category }} {{ image.title }} {{ image.version }} {{ image.unique_id }}"
+              data-group="{{ image.group }}"
+              data-member="{{ image.member }}"
+              data-category="{{ image.category }}"
+              data-title="{{ image.title }}"
+              data-version="{{ image.version }}"
+              data-unique="{{ image.unique_id }}">
+          <!-- 오버레이 추가 -->
+          {% if image.type %}
+            <div class="image-overlay">{{ image.type }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+  
     </div>
     <!-- 카드 상세 모달 -->
     <div id="photo-modal" class="modal" style="display: none;">
@@ -213,52 +231,7 @@
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
           document.addEventListener('DOMContentLoaded', async () => {
-                // ────────────────────────────────────────────
-                // 동적 이미지 로드 (API → 그리드)
-                const API_URL = '/api/images';
-                const grid    = document.getElementById('photo-grid');
-                try {
-                  const res     = await fetch(API_URL);
-                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                  const payload = await res.json();
-                  // 응답이 { images: […] } 또는 [… ] 일 수 있으므로 처리
-                  const list    = Array.isArray(payload)
-                                  ? payload
-                                  : (payload.images || []);
-
-                  // 1) 그리드 비우기
-                  grid.innerHTML = '';
-
-                  // 2) 카드 동적 생성 (원본 속성 그대로 살립니다)
-                  list.forEach(img => {
-                    const div = document.createElement('div');
-                    div.className = 'photo-card-container';
-                    div.innerHTML = `
-                      <img class="photo-card"
-                          src="${img.url}"
-                          loading="lazy"
-                          alt="${img.group} ${img.member} ${img.category} ${img.title} ${img.version} ${img.unique_id}"
-                          data-group="${img.group}"
-                          data-member="${img.member}"
-                          data-category="${img.category}"
-                          data-title="${img.title}"
-                          data-version="${img.version}"
-                          data-unique="${img.unique_id}">
-                      ${img.type ? `<div class="image-overlay">${img.type}</div>` : ''}
-                    `;
-                    grid.appendChild(div);
-                  });
-
-                  // 3) originalCards 갱신 (기존 필터·정렬·카운트 로직에서 사용)
-                  window.originalCards = Array.from(
-                    grid.querySelectorAll('.photo-card-container')
-                  );
-                } catch (e) {
-                  console.error('이미지 로딩 실패:', e);
-                }
-                // ────────────────────────────────────────────
-
-
+          const API_URL = '/api/images';
               // ── ❶ toggleCheck 함수 정의 (최상단)
               function toggleCheck(img) {
                 img.classList.toggle('checked');
