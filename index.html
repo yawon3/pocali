@@ -18,26 +18,7 @@
           <button id="view-toggle">👥 친구보기</button>  <!-- ← 새 버튼 -->
         </header>
   <!-- 카드 그리드 -->        
-	<div id="photo-grid">
-    {% for image in images %}
-        <div class="photo-card-container">
-          <img class="photo-card" 
-              src="{{ image.url }}" 
-              loading="lazy"
-              alt="{{ image.group }} {{ image.member }} {{ image.category }} {{ image.title }} {{ image.version }} {{ image.unique_id }}"
-              data-group="{{ image.group }}"
-              data-member="{{ image.member }}"
-              data-category="{{ image.category }}"
-              data-title="{{ image.title }}"
-              data-version="{{ image.version }}"
-              data-unique="{{ image.unique_id }}">
-          <!-- 오버레이 추가 -->
-          {% if image.type %}
-            <div class="image-overlay">{{ image.type }}</div>
-          {% endif %}
-        </div>
-      {% endfor %}
-  
+	<div id="photo-grid">  
     </div>
     <!-- 카드 상세 모달 -->
     <div id="photo-modal" class="modal" style="display: none;">
@@ -226,11 +207,54 @@
             if (e.target === $('#photo-modal')) $('#photo-modal').style.display = 'none';
           });
 
+          async function fetchAndRenderImages() {
+            const res = await fetch('https://pocali-backend.onrender.com/api/images');
+            const images = await res.json();
+
+            const grid = document.getElementById('photo-grid');
+            grid.innerHTML = '';
+
+            images.forEach(image => {
+              const container = document.createElement('div');
+              container.className = 'photo-card-container';
+
+              const img = document.createElement('img');
+              img.className = 'photo-card';
+              img.src = image.url;
+              img.alt = `${image.group} ${image.member} ${image.category} ${image.title} ${image.version} ${image.unique_id}`;
+              img.dataset.group = image.group;
+              img.dataset.member = image.member;
+              img.dataset.category = image.category;
+              img.dataset.title = image.title;
+              img.dataset.version = image.version;
+              img.dataset.unique = image.unique_id;
+
+              // 이벤트 등록
+              img.addEventListener('dblclick', () => toggleCheck(img));
+              img.addEventListener('click', () => showModal(img));
+              img.addEventListener('contextmenu', e => e.preventDefault());
+
+              container.appendChild(img);
+
+              if (image.type) {
+                const overlay = document.createElement('div');
+                overlay.className = 'image-overlay';
+                overlay.textContent = image.type;
+                container.appendChild(overlay);
+              }
+
+              grid.appendChild(container);
+            });
+
+            updateCount(); // 렌더 후 카운트 갱신
+          }
+
           
           /* ───────────────────────────────────────────────
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
           document.addEventListener('DOMContentLoaded', () => {
+               fetchAndRenderImages();
               // ── ❶ toggleCheck 함수 정의 (최상단)
               function toggleCheck(img) {
                 img.classList.toggle('checked');
@@ -240,6 +264,8 @@
                 syncLocalDataToServer();
                 updateCount();
               }
+
+              
             /* 1-1. 반복해서 쓰일 DOM 캐시 */
             const $grid          = $('#photo-grid');
             const $viewToggleBtn = $('#view-toggle');
