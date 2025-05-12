@@ -213,21 +213,26 @@
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
            document.addEventListener('DOMContentLoaded', () => {
-             // 0. 렌더링 후에 값을 채울 변수들은 let 으로
-             let originalCards = [];
-             let photoCards    = [];
-          
-             // ── ❶ toggleCheck 함수 정의 ...
+            const LONG_PRESS     = 500;
+            const TAP_THRESHOLD  = 200;
+            const MOVE_THRESHOLD = 10;
+
+            function toggleCheck(img) { /* 위 정의 그대로 */ }
+            // ── ❶ toggleCheck 함수 정의 ...
              const $grid          = $('#photo-grid');
              const $viewToggleBtn = $('#view-toggle');
              const $catToggleBtn  = $('#categoryToggleBtn');
              const $searchInput   = $('#search-input');
+
+             // 0. 렌더링 후에 값을 채울 변수들은 let 으로
+             let originalCards = [];
+             let photoCards    = [];
+          
+             
             
         async function fetchAndRenderImages() {
-            const res    = await fetch('https://pocali-backend.onrender.com/api/images');
-            const images = await res.json();
-            const grid = $('#photo-grid');
-            grid.innerHTML = '';
+            const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+             $grid.innerHTML = '';
 
             images.forEach(image => {
               const container = document.createElement('div');
@@ -298,6 +303,23 @@
             originalCards = Array.from($$('#photo-grid .photo-card-container'));
             photoCards    = Array.from($$('.photo-card'));
 
+             // 카테고리뷰, 검색, 친구 보기 토글 바인딩…
+            $catToggleBtn.addEventListener('click', () => {
+              currentView = currentView === 'id' ? 'category' : 'id';
+              applyFilters();
+            });
+            $searchInput.addEventListener('input', applyFilters);
+            $viewToggleBtn.addEventListener('click', /* … */);
+
+            // 이미지 불러오기 + 초기 뷰 적용
+            fetchAndRenderImages()
+              .then(() => {
+                showById();
+                loadSelfDeck();
+                updateCount();
+              })
+              .catch(console.error);
+
             // ② 이미지별 이벤트 바인딩
             photoCards.forEach(img => {
               // 더블클릭 → 보유체크 토글
@@ -312,28 +334,7 @@
             });
           }
 
-          // 필터/정렬 · 토글 버튼 바인딩
-          $viewToggleBtn.addEventListener('click', () => {
-            if (viewOwner === 'friend') loadSelfDeck();
-            else if (currentFriendUUID)      loadFriendDeck(currentFriendUUID);
-            else alert('먼저 친구를 추가하세요!');
-          });
-          $catToggleBtn.addEventListener('click', () => {
-            currentView = currentView === 'id' ? 'category' : 'id';
-            applyFilters();
-          });
-          $searchInput.addEventListener('input', applyFilters);
-
-          // ③ 초기화 순서: 이미지 불러오기 → 뷰 적용
-          fetchAndRenderImages()
-            .then(() => {
-              showById();     // 고유번호 정렬
-              loadSelfDeck(); // 내 보유 상태 표시
-              updateCount();  // 카운터 갱신
-              // (추가로 pollServerData 등 나머지 로직도 이 다음에 실행)
-            })
-            .catch(console.error);
-       
+   
 
                     
             /* ─────────────────────────────────────────────
