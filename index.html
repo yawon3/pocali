@@ -243,31 +243,34 @@
             let currentFriendUUID= localStorage.getItem('lastFriendUUID')||null;
         
             /* 1-2. 페이지네이션 상태 */
-            let page            = 0;
-            const PAGE_SIZE     = 50;
-            let loading         = false;
+              let page         = 0;
+              const PAGE_SIZE  = 50;
+              let loading      = false;
+              let totalCount   = 0; 
 
         
             // ── 2. 전체 이미지 한 번만 fetch → 저장
             async function loadImages() {
-              // 첫 화면엔 page=0, limit=PAGE_SIZE (50) 만 가져오도록
-              const res = await fetch(
-                `https://pocali-backend.onrender.com/api/images?page=0&limit=${PAGE_SIZE}`
-              );
-              allImages = await res.json();
-              page = 0;
-              renderPage();
-            }
-        
+            // 1) 페이지 인덱스 초기화
+            page = 0;
+            // 2) 첫 페이지만 그리기
+            await renderPage();
+              } 
             // ── 3. 페이지 단위로 slice→DOM 생성 & 이벤트 바인딩
-            function renderPage() {
+              async function renderPage() {
               if (loading) return;
               loading = true;
         
-              const start = page * PAGE_SIZE;
-              const chunk = allImages.slice(start, start + PAGE_SIZE);
-              if (!chunk.length) { loading = false; return; }
-        
+            // 서버에서 해당 페이지만 가져오기
+            const res   = await fetch(
+              `https://pocali-backend.onrender.com/api/images?page=${page}&limit=${PAGE_SIZE}`
+            );
+            const chunk = await res.json();
+            // 첫 응답에서 전체 개수를 읽어둔다
+            if (page === 0) totalCount = parseInt(res.headers.get('X-Total-Count') || 0);
+            if (!chunk.length) { loading = false; return; }
+
+  
               if (page === 0) $grid.innerHTML = '';
         
               chunk.forEach(image => {
@@ -364,7 +367,7 @@
               });  
         
               // ── 7. 최초 한 번만 전체 load 시작
-              loadImages();
+              renderPage();
             
               /* ─────────────────────────────────────────────
                  8. 정렬 & 필터링 UI 함수 (이 블록을 여기에 통째로 옮기세요!)
