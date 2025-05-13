@@ -362,7 +362,26 @@
         
             // ── 7. 최초 한 번만 전체 load 시작
             loadImages();
+           // ── 8. FAB 버튼 클릭 → 유저 설정 모달 열기/닫기
+           const $fab           = document.getElementById('fab');
+           const $userModal     = document.getElementById('user-modal');
+           const $userModalClose= document.getElementById('user-modal-close');
+        
+           $fab.addEventListener('click', () => {
+             $userModal.style.display = 'block';
+           });
+           $userModalClose.addEventListener('click', () => {
+             $userModal.style.display = 'none';
+           });
+           $userModal.addEventListener('click', e => {
+             if (e.target === $userModal) {
+               $userModal.style.display = 'none';
+             }
+           });
+
           });   
+
+
 
             /* ─────────────────────────────────────────────
                2. 공통 유틸
