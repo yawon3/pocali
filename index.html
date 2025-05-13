@@ -257,24 +257,49 @@
 
         // ── 2) 현재 currentPage 에 해당하는 50장만 그려주는 함수
         function renderNextPage() {
-          const start = currentPage * PAGE_SIZE;
           const slice = allImages.slice(start, start + PAGE_SIZE);
-          if (!slice.length) return;
-
           slice.forEach(image => {
             const container = document.createElement('div');
             container.className = 'photo-card-container';
             const img = document.createElement('img');
             img.className = 'photo-card';
             img.src = image.url;
-            /* …dataset/alt/overlay 세팅, 이벤트 바인딩 (dblclick, pointerdown/up 등) 그대로 복사… */
+            // … 데이터셋 세팅 …
+
+            // ➊ 더블클릭 → 체크 토글
+            img.addEventListener('dblclick', () => {
+              if (viewOwner === 'self') toggleCheck(img);
+            });
+
+            // ➋ 터치: 짧게 → 체크, 길게 → 모달
+            let pressStart, pressTimer;
+            img.addEventListener('pointerdown', e => {
+              if (viewOwner!=='self') return;
+              pressStart = performance.now();
+              pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+            });
+            img.addEventListener('pointerup', e => {
+              clearTimeout(pressTimer);
+              const dt = performance.now() - pressStart;
+              if (e.pointerType === 'touch' && dt < TAP_THRESHOLD) {
+                toggleCheck(img);
+              }
+            });
+            img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+            // ➌ 우클릭 또는 롱프레스 메뉴 차단 → 모달
+            img.addEventListener('contextmenu', e => {
+              e.preventDefault();
+              showModal(img);
+            });
+
             container.appendChild(img);
             $grid.appendChild(container);
           });
-
           currentPage += 1;
-          // (옵션) 캐시 갱신, 카운트·필터 함수와 연동하려면 여기에 originalCards/photoCards 갱신
+          updateCount();
         }
+
 
         // ── 3) 스크롤 시 다음 페이지 렌더
         window.addEventListener('scroll', () => {
