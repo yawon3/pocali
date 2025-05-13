@@ -183,13 +183,25 @@
             const $userModalClose= document.getElementById('user-modal-close');
             const $resetBtn      = document.getElementById('reset-checks');
 
+            async function syncLocalDataToServer() {
+            const me = localStorage.getItem('myUUID');
+            if (!me) return;
+            const data = JSON.parse(localStorage.getItem('userData') || '{}');
+            await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ data })
+            });
+          }
+
             // 2. 보유 체크 토글
             function toggleCheck(img) {
               img.classList.toggle('checked');
               const data = JSON.parse(localStorage.getItem('userData')||'{}');
               data[img.dataset.unique] = img.classList.contains('checked');
               localStorage.setItem('userData', JSON.stringify(data));
-              updateCount();
+              syncLocalDataToServer();   // 이 줄이 있어도 stub가 정의되어 있으면 OK
+              updateCount();             // 여기서 바로 카운트가 갱신됩니다
             }
 
             // 3. 상세 모달 띄우기
@@ -286,8 +298,10 @@
             }
             // 6. 무한 스크롤
             window.addEventListener('scroll', () => {
-              console.log('scroll', window.scrollY, document.body.offsetHeight);
-              if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+              const scrollPos = window.innerHeight + window.scrollY;
+              const threshold = document.documentElement.scrollHeight - 200;
+              console.log('scroll', scrollPos, threshold);
+              if (scrollPos >= threshold && !loading) {
                 renderPage();
               }
             });
