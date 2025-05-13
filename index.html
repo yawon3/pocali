@@ -220,11 +220,11 @@
             async function renderPage() {
               if (loading) return;
               loading = true;
-            // 검색어(q) 파라미터 포함
-            const q = $searchInput.value.trim();
-            const url = `/api/images?page=${page}&limit=${PAGE_SIZE}` +
-                        (q ? `&q=${encodeURIComponent(q)}` : '');
-            const res = await fetch(url);
+            // 검색어(q) 파라미터 포함 + 절대경로 백엔드 호출
+            const q     = $searchInput.value.trim();
+            const base  = `https://pocali-backend.onrender.com/api/images?page=${page}&limit=${PAGE_SIZE}`;
+            const url   = q ? `${base}&q=${encodeURIComponent(q)}` : base;
+            const res   = await fetch(url);
               const items = await res.json();
               if (page===0) {
                 // 헤더에서 전체 개수 읽기
@@ -363,7 +363,7 @@
 
             /** 친구 보유 카드 표시 */
             async function loadFriendDeck (uuid) {
-              const res = await fetch(`/api/friend/${uuid}/collection`);
+              const res = await fetch(`https://pocali-backend.onrender.com/api/friend/${uuid}/collection`);
               if (!res.ok) { alert('친구 데이터를 불러올 수 없습니다.'); return; }
               const friendData = (await res.json()).data || {};
               photoCards.forEach(img => {
@@ -488,7 +488,7 @@
               localStorage.removeItem('userData');
               updateCount();
               const me = localStorage.getItem('myUUID');
-              if (me) await fetch(`/api/user/${me}`, {
+              if (me) await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ data: {} })
