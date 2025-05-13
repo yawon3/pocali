@@ -231,6 +231,11 @@
              const $catToggleBtn  = $('#categoryToggleBtn');
              const $searchInput   = $('#search-input');
 
+            // ── 클라이언트 페이징 상태
+            let allImages    = [];     // 전체 데이터를 한 번만 저장
+            let currentPage  = 0;      // 현재 렌더된 페이지 인덱스
+            const PAGE_SIZE  = 50;     // 한 페이지 당 아이템 수
+
              // 0. 렌더링 후에 값을 채울 변수들은 let 으로
              let originalCards = [];
              let photoCards    = [];
@@ -238,12 +243,12 @@
              
             
         async function fetchAndRenderImages() {
-           const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
-           // 로컬 grid 변수 선언
-           const grid = document.getElementById('photo-grid');
+           // 1) 전체 이미지를 한 번만 가져와 allImages에 저장
+           allImages = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+           currentPage = 0;
            $grid.innerHTML = '';
-
-            images.forEach(image => {
+           renderNextPage();  // 첫 페이지 렌더
+           
               const container = document.createElement('div');
               container.className = 'photo-card-container';
 
@@ -301,15 +306,50 @@
                 });
 
 
-            });
-                  
-            // ① 렌더링된 이미지 캐시 갱신
-          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
-          photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
-
-      
           }
-          
+
+        // ── 2) 현재 currentPage 에 해당하는 50장만 그려주는 함수
+        function renderNextPage() {
+          const start = currentPage * PAGE_SIZE;
+          const slice = allImages.slice(start, start + PAGE_SIZE);
+          if (!slice.length) return;
+
+          slice.forEach(image => {
+            const container = document.createElement('div');
+            container.className = 'photo-card-container';
+            const img = document.createElement('img');
+            img.className = 'photo-card';
+            img.src = image.url;
+            /* …dataset/alt/overlay 세팅, 이벤트 바인딩 (dblclick, pointerdown/up 등) 그대로 복사… */
+            container.appendChild(img);
+            $grid.appendChild(container);
+          });
+
+          currentPage += 1;
+          // (옵션) 캐시 갱신, 카운트·필터 함수와 연동하려면 여기에 originalCards/photoCards 갱신
+        }
+
+        // ── 3) 스크롤 시 다음 페이지 렌더
+        window.addEventListener('scroll', () => {
+          const scrollBottom = window.scrollY + window.innerHeight;
+          const pageHeight   = document.documentElement.scrollHeight;
+          if (scrollBottom >= pageHeight - 200) {
+            renderNextPage();
+          }
+       });
+
+        // ── 4) 초기 호출: 전체 fetch → 첫 페이지만 미리 렌더
+        fetchAndRenderImages()
+          .then(() => {
+            showById();
+            loadSelfDeck();
+            updateCount();
+          })
+          .catch(console.error);
+
+
+
+
           $searchInput.addEventListener('input', applyFilters);
 
           $viewToggleBtn.addEventListener('click', () => {
