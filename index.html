@@ -360,26 +360,61 @@
               else alert('먼저 친구를 추가하세요!');
               });  
         
-            // ── 7. 최초 한 번만 전체 load 시작
-            loadImages();
-           // ── 8. FAB 버튼 클릭 → 유저 설정 모달 열기/닫기
-           const $fab           = document.getElementById('fab');
-           const $userModal     = document.getElementById('user-modal');
-           const $userModalClose= document.getElementById('user-modal-close');
-        
-           $fab.addEventListener('click', () => {
-             $userModal.style.display = 'block';
-           });
-           $userModalClose.addEventListener('click', () => {
-             $userModal.style.display = 'none';
-           });
-           $userModal.addEventListener('click', e => {
-             if (e.target === $userModal) {
-               $userModal.style.display = 'none';
-             }
-           });
-
-          });   
+              // ── 7. 최초 한 번만 전체 load 시작
+              loadImages();
+            
+              /* ─────────────────────────────────────────────
+                 8. 정렬 & 필터링 UI 함수 (이 블록을 여기에 통째로 옮기세요!)
+                 ───────────────────────────────────────────── */
+              function showById(list = null) {
+                const cards = (list ?? originalCards).slice();
+                cards.sort((a, b) =>
+                  $('.photo-card', b).dataset.unique -
+                  $('.photo-card', a).dataset.unique
+                );
+                $grid.innerHTML = '';
+                cards.forEach(c => $grid.appendChild(c));
+                updateCount();
+              }
+            
+              function showByCategory() {
+                const query = ($searchInput.value||'').toLowerCase();
+                const filtered = originalCards.filter(div => {
+                  const img = $('.photo-card', div);
+                  const alt = img.alt.toLowerCase();
+                  const grp = img.dataset.group.toLowerCase();
+                  return (!query||alt.includes(query))
+                     && (!advancedFilters.groups.length || advancedFilters.groups.includes(grp.toUpperCase()));
+                });
+                const buckets = {};
+                filtered.forEach(div => {
+                  const img = $('.photo-card', div);
+                  const key = [ img.dataset.category||'미분류',
+                                img.dataset.title, img.dataset.version ]
+                              .filter(Boolean).join(' | ');
+                  (buckets[key] = buckets[key]||[]).push(div);
+                });
+                $grid.innerHTML = '';
+                Object.entries(buckets).forEach(([hdr, cards]) => {
+                  const h2 = document.createElement('h2');
+                  h2.textContent = hdr; $grid.appendChild(h2);
+                  cards.forEach(d => $grid.appendChild(d));
+                });
+                updateCount();
+              }
+            
+              function applyFilters() {
+                if (currentView === 'category')      showByCategory();
+                else /* 'id' */                      showById(
+                       originalCards.filter(div => {
+                         const img = $('.photo-card', div);
+                         return img.alt.toLowerCase()
+                                    .includes($searchInput.value.toLowerCase());
+                       })
+                     );
+              }
+            
+            });  // ← now this closes document.addEventListener('DOMContentLoaded')
 
 
 
