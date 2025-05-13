@@ -309,6 +309,11 @@
                 container.appendChild(img);
                 $grid.appendChild(container);
               });
+
+            // ── 렌더 직후: originalCards, photoCards 캐시 갱신
+            originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+            photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
+
         
               page += 1;
               loading = false;
