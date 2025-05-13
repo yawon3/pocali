@@ -233,11 +233,11 @@
               updateCount();
             }
         
-            /* 1-1. DOM 캐시 & 전역 상태 */
-            const $grid          = $('#photo-grid');
-            const $viewToggleBtn = $('#view-toggle');
-            const $catToggleBtn  = $('#categoryToggleBtn');
-            const $searchInput   = $('#search-input');
+            // ── 전역 DOM 캐시 (모든 코드에서 접근 가능)
+            const $grid          = document.getElementById('photo-grid');
+            const $viewToggleBtn = document.getElementById('view-toggle');
+            const $catToggleBtn  = document.getElementById('categoryToggleBtn');
+            const $searchInput   = document.getElementById('search-input');
             let currentView      = 'id';
             let viewOwner        = 'self';
             let currentFriendUUID= localStorage.getItem('lastFriendUUID')||null;
