@@ -247,66 +247,13 @@
            allImages = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
            currentPage = 0;
            $grid.innerHTML = '';
-           renderNextPage();  // 첫 페이지 렌더
+              renderNextPage();  // 첫 페이지 렌더
+              }  // ← 여기서 fetchAndRenderImages()가 깔끔하게 닫힙니다.
            
-              const container = document.createElement('div');
-              container.className = 'photo-card-container';
-
-              const img = document.createElement('img');
-              img.className = 'photo-card';
-              img.src         = image.url.startsWith('http')
-                                  ? image.url
-                                  : `https://pocali-backend.onrender.com${image.url}`;
-              img.loading     = 'lazy';
-              img.alt         = `${image.group} ${image.member} ${image.category} ${image.title} ${image.version} #${image.unique_id}`;
-              img.dataset.group   = image.group;
-              img.dataset.member  = image.member;
-              img.dataset.category= image.category;
-              img.dataset.title   = image.title;
-              img.dataset.version = image.version;
-              img.dataset.unique  = image.unique_id;
-
-              container.appendChild(img);
-              if (image.type) {
-                const overlay = document.createElement('div');
-                overlay.className = 'image-overlay';
-                overlay.textContent = image.type;
-                container.appendChild(overlay);
-              }
-              $grid.appendChild(container);
-
-                    // ── 이미지별 이벤트 바인딩 (PC+모바일 모두)
-                let startTime, pressTimer;
-                img.addEventListener('pointerdown', e => {
-                  if (viewOwner !== 'self') return;
-                  startTime = performance.now();
-                  // 500ms 후에만 모달 띄우기
-                  pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-                });
-                img.addEventListener('pointerup', e => {
-                  clearTimeout(pressTimer);
-                  const delta = performance.now() - startTime;
-                  // 터치로 짧게 누르면 보유체크
-                  if (e.pointerType === 'touch' && delta < TAP_THRESHOLD) {
-                    toggleCheck(img);
-                  }
-                });
-                img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
-
-                // PC에서 더블클릭으로 보유체크
-                img.addEventListener('dblclick', () => {
-                  if (viewOwner !== 'self') return;
-                  toggleCheck(img);
-                });
-
-                // 우클릭(또는 모바일 롱프레스) 메뉴 차단 & 모달
-                img.addEventListener('contextmenu', e => {
-                  e.preventDefault();
-                  showModal(img);
-                });
+             
 
 
-          }
+          
 
         // ── 2) 현재 currentPage 에 해당하는 50장만 그려주는 함수
         function renderNextPage() {
@@ -358,17 +305,7 @@
             else alert('먼저 친구를 추가하세요!');
           });
 
-          // 이제야 한 번만 이미지를 불러옵니다.
-          fetchAndRenderImages()
-            .then(() => {
-              showById();
-              loadSelfDeck();
-              updateCount();
-            })
-            .catch(console.error);
-   
-
-                    
+                           
             /* ─────────────────────────────────────────────
                2. 공통 유틸
                ───────────────────────────────────────────── */
