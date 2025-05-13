@@ -189,7 +189,6 @@
               const data = JSON.parse(localStorage.getItem('userData')||'{}');
               data[img.dataset.unique] = img.classList.contains('checked');
               localStorage.setItem('userData', JSON.stringify(data));
-              syncLocalDataToServer();
               updateCount();
             }
 
@@ -285,9 +284,9 @@
               loading = false;
               updateCount();
             }
-
             // 6. 무한 스크롤
             window.addEventListener('scroll', () => {
+              console.log('scroll', window.scrollY, document.body.offsetHeight);
               if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
                 renderPage();
               }
