@@ -203,6 +203,8 @@
             // ── 캐시: 정렬·필터·카운트용
             let originalCards   = [];
             let photoCards      = [];
+            // ── 전체 이미지 리스트 (총 개수 계산용)
+            let allImages       = [];
 
 
           /* X 버튼 -or- 바깥 클릭 → 모달 닫기 */
@@ -241,7 +243,6 @@
             let currentFriendUUID= localStorage.getItem('lastFriendUUID')||null;
         
             /* 1-2. 페이지네이션 상태 */
-            let allImages       = [];
             let page            = 0;
             const PAGE_SIZE     = 50;
             let loading         = false;
@@ -368,10 +369,12 @@
                ───────────────────────────────────────────── */
             /** 현재 화면의 총 카드수 / 보유카드수 표시 */
             function updateCount () {
-              const visible = originalCards.filter(card => card.offsetParent !== null);
-              const have    = visible.filter(card =>
-                               $('.photo-card', card).classList.contains('checked'));
-              $('#count-display').textContent = `${have.length} / ${visible.length}`;
+              // “보유”는 localStorage에 true인 값의 개수
+              const data = JSON.parse(localStorage.getItem('userData') || '{}');
+              const have = Object.values(data).filter(v => v).length;
+              // “전체”는 allImages.length
+              const total = allImages.length;
+              $('#count-display').textContent = `${have} / ${total}`;
             }
           
             /** 카드 리스트를 그리드에 그대로 렌더링 */
@@ -467,7 +470,7 @@
 
                 return textOK && groupOK && memberOK;
               });
-              if (currentView === 'category') showByCategory(filtered);
+              if (currentView === 'category') showByCategory();
               else                            showById(filtered);
             }
 
