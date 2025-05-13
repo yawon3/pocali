@@ -198,7 +198,11 @@
 
             // 모달 안 이미지에서도 우클릭 메뉴 차단
             $('#modal-image').addEventListener('contextmenu', e => e.preventDefault());
-
+           
+           
+            // ── 캐시: 정렬·필터·카운트용
+            let originalCards   = [];
+            let photoCards      = [];
 
 
           /* X 버튼 -or- 바깥 클릭 → 모달 닫기 */
@@ -241,9 +245,7 @@
             let page            = 0;
             const PAGE_SIZE     = 50;
             let loading         = false;
-            // ── 캐시: 정렬·필터·카운트용
-            let originalCards   = [];
-            let photoCards      = [];
+
         
             // ── 2. 전체 이미지 한 번만 fetch → 저장
             async function loadImages() {
