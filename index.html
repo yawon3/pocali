@@ -231,11 +231,6 @@
              const $catToggleBtn  = $('#categoryToggleBtn');
              const $searchInput   = $('#search-input');
 
-            // ── 클라이언트 페이징 상태
-            let allImages    = [];     // 전체 데이터를 한 번만 저장
-            let currentPage  = 0;      // 현재 렌더된 페이지 인덱스
-            const PAGE_SIZE  = 50;     // 한 페이지 당 아이템 수
-
              // 0. 렌더링 후에 값을 채울 변수들은 let 으로
              let originalCards = [];
              let photoCards    = [];
@@ -243,85 +238,78 @@
              
             
         async function fetchAndRenderImages() {
-           // 1) 전체 이미지를 한 번만 가져와 allImages에 저장
-           allImages = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
-           currentPage = 0;
+           const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+           // 로컬 grid 변수 선언
+           const grid = document.getElementById('photo-grid');
            $grid.innerHTML = '';
-              renderNextPage();  // 첫 페이지 렌더
-              }  // ← 여기서 fetchAndRenderImages()가 깔끔하게 닫힙니다.
-           
-             
 
+            images.forEach(image => {
+              const container = document.createElement('div');
+              container.className = 'photo-card-container';
 
-          
+              const img = document.createElement('img');
+              img.className = 'photo-card';
+              img.src         = image.url.startsWith('http')
+                                  ? image.url
+                                  : `https://pocali-backend.onrender.com${image.url}`;
+              img.loading     = 'lazy';
+              img.alt         = `${image.group} ${image.member} ${image.category} ${image.title} ${image.version} #${image.unique_id}`;
+              img.dataset.group   = image.group;
+              img.dataset.member  = image.member;
+              img.dataset.category= image.category;
+              img.dataset.title   = image.title;
+              img.dataset.version = image.version;
+              img.dataset.unique  = image.unique_id;
 
-        // ── 2) 현재 currentPage 에 해당하는 50장만 그려주는 함수
-        function renderNextPage() {
-          const slice = allImages.slice(start, start + PAGE_SIZE);
-          slice.forEach(image => {
-            const container = document.createElement('div');
-            container.className = 'photo-card-container';
-            const img = document.createElement('img');
-            img.className = 'photo-card';
-            img.src = image.url;
-            // … 데이터셋 세팅 …
-
-            // ➊ 더블클릭 → 체크 토글
-            img.addEventListener('dblclick', () => {
-              if (viewOwner === 'self') toggleCheck(img);
-            });
-
-            // ➋ 터치: 짧게 → 체크, 길게 → 모달
-            let pressStart, pressTimer;
-            img.addEventListener('pointerdown', e => {
-              if (viewOwner!=='self') return;
-              pressStart = performance.now();
-              pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-            });
-            img.addEventListener('pointerup', e => {
-              clearTimeout(pressTimer);
-              const dt = performance.now() - pressStart;
-              if (e.pointerType === 'touch' && dt < TAP_THRESHOLD) {
-                toggleCheck(img);
+              container.appendChild(img);
+              if (image.type) {
+                const overlay = document.createElement('div');
+                overlay.className = 'image-overlay';
+                overlay.textContent = image.type;
+                container.appendChild(overlay);
               }
+              $grid.appendChild(container);
+
+                    // ── 이미지별 이벤트 바인딩 (PC+모바일 모두)
+                let startTime, pressTimer;
+                img.addEventListener('pointerdown', e => {
+                  if (viewOwner !== 'self') return;
+                  startTime = performance.now();
+                  // 500ms 후에만 모달 띄우기
+                  pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+                });
+                img.addEventListener('pointerup', e => {
+                  clearTimeout(pressTimer);
+                  const delta = performance.now() - startTime;
+                  // 터치로 짧게 누르면 보유체크
+                  if (e.pointerType === 'touch' && delta < TAP_THRESHOLD) {
+                    toggleCheck(img);
+                  }
+                });
+                img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+                // PC에서 더블클릭으로 보유체크
+                img.addEventListener('dblclick', () => {
+                  if (viewOwner !== 'self') return;
+                  toggleCheck(img);
+                });
+
+                // 우클릭(또는 모바일 롱프레스) 메뉴 차단 & 모달
+                img.addEventListener('contextmenu', e => {
+                  e.preventDefault();
+                  showModal(img);
+                });
+
+
             });
-            img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+                  
+            // ① 렌더링된 이미지 캐시 갱신
+          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+          photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
 
-            // ➌ 우클릭 또는 롱프레스 메뉴 차단 → 모달
-            img.addEventListener('contextmenu', e => {
-              e.preventDefault();
-              showModal(img);
-            });
-
-            container.appendChild(img);
-            $grid.appendChild(container);
-          });
-          currentPage += 1;
-          updateCount();
-        }
-
-
-        // ── 3) 스크롤 시 다음 페이지 렌더
-        window.addEventListener('scroll', () => {
-          const scrollBottom = window.scrollY + window.innerHeight;
-          const pageHeight   = document.documentElement.scrollHeight;
-          if (scrollBottom >= pageHeight - 200) {
-            renderNextPage();
+      
           }
-       });
-
-        // ── 4) 초기 호출: 전체 fetch → 첫 페이지만 미리 렌더
-        fetchAndRenderImages()
-          .then(() => {
-            showById();
-            loadSelfDeck();
-            updateCount();
-          })
-          .catch(console.error);
-
-
-
-
+          
           $searchInput.addEventListener('input', applyFilters);
 
           $viewToggleBtn.addEventListener('click', () => {
@@ -330,7 +318,17 @@
             else alert('먼저 친구를 추가하세요!');
           });
 
-                           
+          // 이제야 한 번만 이미지를 불러옵니다.
+          fetchAndRenderImages()
+            .then(() => {
+              showById();
+              loadSelfDeck();
+              updateCount();
+            })
+            .catch(console.error);
+   
+
+                    
             /* ─────────────────────────────────────────────
                2. 공통 유틸
                ───────────────────────────────────────────── */
