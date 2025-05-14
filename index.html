@@ -242,8 +242,10 @@
              let photoCards    = [];
           
            async function fetchAndRenderImages() {
-              // 1) 전체 이미지 메타데이터만 불러와서 allImages에 저장
-              allImages = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+               // 1) 전체 이미지 메타데이터 + 전체 개수 가져오기
+              const resp    = await fetch('https://pocali-backend.onrender.com/api/images');
+              allImages     = await resp.json();
+              totalCount    = allImages.length;
               // 2) 첫 배치 렌더링 전 초기화
               currentBatch = 0;
               $grid.innerHTML = '';
@@ -783,12 +785,12 @@
             photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
 
             // 6) 상태 갱신
-            // header에서 한 번만 전체 개수 읽기
-            if (currentBatch === 0 && res) {
-              totalCount = parseInt(res.headers.get('X-Total-Count') || allImages.length, 10);
+            if (currentBatch === 0) {
+              // 첫 배치 이후에도 항상 allImages.length 를 분모로 사용
+              totalCount = allImages.length;
             }
             currentBatch++;
-             updateCount();
+            updateCount();
             isRendering = false;
           }
           
