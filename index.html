@@ -400,8 +400,10 @@
               $grid.innerHTML = '';
               Object.entries(buckets)
                  .sort(([,a],[,b]) => {
-                  const imgA = a[0].querySelector('.photo-card');
-                  const imgB = b[0].querySelector('.photo-card');
+                 // a, b 모두 div.photo-card-container 배열이므로 첫 요소가 분명히 존재하도록 보장
+                 const cardA = a[0], cardB = b[0];
+                 const imgA  = cardA.querySelector('.photo-card');
+                 const imgB  = cardB.querySelector('.photo-card');
                   return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
                 })
                 .forEach(([header, cards]) => {
@@ -675,6 +677,32 @@
                 document.body.removeChild(loader);
               });
             }
+            // ── ➊ 상세정보 모달 열기 함수 ─────────────────────────
+            function showModal(img) {
+              const modal     = document.getElementById('photo-modal');
+              const modalImg  = document.getElementById('modal-image');
+              const modalInfo = document.getElementById('modal-info');
+
+              modalImg.src = img.src;
+              modalInfo.innerHTML = `
+                <p>${img.dataset.group   || ''}</p>
+                <p>${img.dataset.member  || ''}</p>
+                <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+                <p>${img.dataset.version || ''}</p>
+                <p>#${img.dataset.unique}</p>
+              `;
+              modal.style.display = 'block';
+            }
+            // 모달 닫기 핸들러(기존 X 버튼 / 바깥 클릭)
+            document.getElementById('modal-close').addEventListener('click', () => {
+              document.getElementById('photo-modal').style.display = 'none';
+            });
+            document.getElementById('photo-modal').addEventListener('click', e => {
+              if (e.target === document.getElementById('photo-modal')) {
+                document.getElementById('photo-modal').style.display = 'none';
+              }
+            });
+
 
             // ─── 페이징별 렌더링 함수 ─────────────────────────
              function renderNextBatch() {
