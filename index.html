@@ -448,26 +448,7 @@
             }
           
             /** 친구 보유 카드 표시 */
-            async function loadFriendDeck (uuid) {
-              const res = await fetch(`/api/friend/${uuid}/collection`);
-              if (!res.ok) {
-                alert('친구 데이터를 불러올 수 없습니다.');
-                return;
-              }
-          
-              const friendData = (await res.json()).data || {};
-              photoCards.forEach(img => {
-                img.classList.toggle('checked', !!friendData[img.dataset.unique]);
-                img.style.pointerEvents = 'none';   // 수정 금지
-              });
-          
-              viewOwner         = 'friend';
-              currentFriendUUID = uuid;
-              localStorage.setItem('lastFriendUUID', uuid);
-          
-              $viewToggleBtn.textContent = '👤 내 카드보기';
-              updateCount();
-            }
+            
           
             /* 전역(콘솔)에서도 호출할 수 있도록 */
             window.loadSelfDeck   = loadSelfDeck;
@@ -540,7 +521,35 @@
               if (e.target === $userDataModal) $userDataModal.style.display = 'none';
             });
 
-
+             // ── 1) 디바이스당 UUID 발급 (회원가입 불필요)
+             function ensureMyUUID() {
+               let uid = localStorage.getItem('myUUID');
+               if (!uid) {
+                 uid = crypto.randomUUID();
+                 localStorage.setItem('myUUID', uid);
+                 syncLocalDataToServer();  // 빈 데이터라도 바로 올려 두기
+               }
+               return uid;
+             }
+           
+             // ── 2) 내 체크 데이터만 Firebase에 쓰기
+             async function syncLocalDataToServer() {
+               const uid  = ensureMyUUID();
+               const data = JSON.parse(localStorage.getItem('userData') || '{}');
+               await set(ref(db, `users/${uid}/cards`), data);
+             }
+           
+             // ── 3) 친구 UUID 경로에서 읽기만 수행
+             async function loadFriendDeck(uuid) {
+               const snapshot = await get(ref(db, `users/${uuid}/cards`));
+               const friendData = snapshot.exists() ? snapshot.val() : {};
+               applyFriendData(friendData);
+           
+               viewOwner         = 'friend';
+               currentFriendUUID = uuid;
+               localStorage.setItem('lastFriendUUID', uuid);
+               $viewToggleBtn.textContent = '👤 내 카드보기';
+             }
 
 
 
@@ -559,28 +568,7 @@
             /* 🔻 ❺-B : 유저 데이터 모달 & 서버 동기화 ----------------------- */
             const $loadUserBtn  = $('#load-user-data');      // ① “유저 데이터 불러오기”
 
-            // 1) UUID 가 없으면 서버에서 새로 발급받기
-            async function ensureMyUUID () {
-              let me = localStorage.getItem('myUUID');
-              if (me) return me;
-              const r = await fetch('/api/register', { method:'POST' });
-              me = (await r.json()).user_id;
-              localStorage.setItem('myUUID', me);
-              return me;
-            }
-
-            // 2) 로컬 userData → 서버 DB 업로드
-            async function syncLocalDataToServer () {
-              const me = localStorage.getItem('myUUID');
-              if (!me) return;
-              const data = JSON.parse(localStorage.getItem('userData') || '{}');
-              await fetch(`/api/user/${me}`, {
-                method : 'POST',
-                headers: { 'Content-Type':'application/json' },
-                body   : JSON.stringify({ data })
-              });
-            }
-
+            
             // 3) “유저 데이터 불러오기” 버튼 클릭 시 모달 열기
             $loadUserBtn?.addEventListener('click', async () => {
               $userModal.style.display = 'none';          // 기존 모달 닫기
