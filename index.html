@@ -154,6 +154,57 @@
             </div>
         </div>
        <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
+        
+        <script type="module">
+          import { initializeApp } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-app.js";
+          import {
+            getDatabase,
+            ref,
+            set,
+            get,
+            onValue
+          } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
+
+          // ❶ 초기화
+          const app = initializeApp(firebaseConfig);
+          const db  = getDatabase(app);
+
+          // ❷ 읽기/쓰기 함수 정의
+          async function syncLocalDataToServer() {
+            const uid  = localStorage.getItem("myUUID");
+            if (!uid) return;
+            const data = JSON.parse(localStorage.getItem("userData") || "{}");
+            await set(ref(db, `users/${uid}`), data);
+          }
+
+          async function loadUserData() {
+            const uid = localStorage.getItem("otherUUID") || localStorage.getItem("myUUID");
+            if (!uid) return {};
+            const snapshot = await get(ref(db, `users/${uid}`));
+            if (snapshot.exists()) {
+              const data = snapshot.val();
+              localStorage.setItem("userData", JSON.stringify(data));
+              updateCount();
+              if (currentView === 'category') showByCategory();
+              else showById();
+              loadSelfDeck();
+              return data;
+            }
+            return {};
+          }
+
+          // ❸ 친구 데이터 실시간 구독 (선택)
+          let friendListener = null;
+          function subscribeFriendData(uuid) {
+            if (friendListener) friendListener();  // 이전 리스너 해제
+            const r = ref(db, `users/${uuid}`);
+            friendListener = onValue(r, snap => {
+              const data = snap.val() || {};
+              applyFriendData(data);
+            });
+          }
+        </script>
+
         <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
         <script>
