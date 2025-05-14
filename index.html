@@ -267,6 +267,9 @@
                   $grid.innerHTML = '';
                   renderNextBatch();
                 }
+                  // ── ➊ 상세정보 모달 열기 함수 ─────────────────────────
+                  function showModal(img) { … }
+                
                 function renderNextBatch() {
                   if (isRendering) return;
                   isRendering = true;
@@ -372,56 +375,48 @@
 
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
             function showByCategory() {
-              const query = ($searchInput.value || '').toLowerCase();
+              const q = $searchInput.value.toLowerCase();
 
-              // ① 필터링
-              const filtered = originalCards.filter(div => {
-                const img    = div.querySelector('.photo-card');
-                const alt    = img.alt.toLowerCase();
-                const group  = img.dataset.group.toLowerCase();
-                const member = img.dataset.member.toLowerCase();
+            // 1) 필터링
+            const filtered = originalCards.filter(div => {
+              const img = div.querySelector('.photo-card');
+              if (!img) return false;
+              const alt    = img.alt.toLowerCase();
+              const grp    = img.dataset.group.toLowerCase();
+              const mem    = img.dataset.member.toLowerCase();
+              const textOK = !q || alt.includes(q);
+              const grpOK  = !advancedFilters.groups.length ||
+                            advancedFilters.groups.includes(grp.toUpperCase());
+              const memOK  = !advancedFilters.members.length ||
+                            advancedFilters.members.some(v => mem.includes(v.toLowerCase()));
+              return textOK && grpOK && memOK;
+            });
 
-                const textOK   = !query || alt.includes(query);
-                const groupOK  = !advancedFilters.groups.length ||
-                                advancedFilters.groups.includes(group.toUpperCase());
-                const memberOK = !advancedFilters.members.length ||
-                                advancedFilters.members.some(v => member.includes(v.toLowerCase()));
+            // 2) 그룹핑
+            const buckets = {};
+            filtered.forEach(div => {
+              const img = div.querySelector('.photo-card');
+              const key = [ img.dataset.category||'미분류',
+                            img.dataset.title, img.dataset.version ]
+                          .filter(Boolean).join(' | ');
+              (buckets[key] = buckets[key] || []).push(div);
+            });
 
-                return textOK && groupOK && memberOK;
-              });
-
-              // ② 그룹핑 (category | title | version)
-              const buckets = {};
-              filtered.forEach(div => {
-                const img = div.querySelector('.photo-card');
-                const key = [
-                  img.dataset.category || '미분류',
-                  img.dataset.title    || '',
-                  img.dataset.version  || ''
-                ].filter(Boolean).join(' | ');
-                (buckets[key] = buckets[key] || []).push(div);
-              });
-
-              // ③ 헤더 + 카드 렌더링
-              $grid.innerHTML = '';
+            $grid.innerHTML = '';
               Object.entries(buckets)
-                .sort(([,a],[,b]) => {
-                  // 각 그룹 첫 카드 안에서 .photo-card img를 찾아 고유번호 비교
-                  const imgA = a[0].querySelector('.photo-card');
-                  const imgB = b[0].querySelector('.photo-card');
-                  return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
+                .sort(([,cardsA],[,cardsB]) => {
+                  const aImg = cardsA[0].querySelector('.photo-card');
+                  const bImg = cardsB[0].querySelector('.photo-card');
+                  return Number(bImg.dataset.unique) - Number(aImg.dataset.unique);
                 })
-                .forEach(([header, cards]) => {
+                .forEach(([hdr,cards]) => {
                   const h2 = document.createElement('h2');
-                  h2.textContent  = header;
-                  h2.style.margin = '16px 0 8px';
-                  $grid.appendChild(h2);
-
-                  cards.sort((a, b) => {
-                    const imgA = a.querySelector('.photo-card');
-                    const imgB = b.querySelector('.photo-card');
-                    return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
-                  }).forEach(div => $grid.appendChild(div));
+                  h2.textContent = hdr; $grid.appendChild(h2);
+                  cards.sort((a,b) => {
+                    const aImg = a.querySelector('.photo-card');
+                    const bImg = b.querySelector('.photo-card');
+                    return Number(bImg.dataset.unique) - Number(aImg.dataset.unique);
+                  }).forEach(d => $grid.appendChild(d));
                 });
 
               updateCount();
@@ -449,8 +444,13 @@
 
                 return textOK && groupOK && memberOK;
               });
-              if (currentView === 'category') showByCategory();
-              else                            showById(filtered);
+              function applyFilters() {
+              // …필터 배열 계산…
+              if (currentView === 'category') {
+                showByCategory();
+              } else {
+                showById(filtered);
+              }
             }
 
             
@@ -529,6 +529,7 @@
               if (e.target === $userDataModal) $userDataModal.style.display = 'none';
             });
 
+
             
             // ── “다른 UUID 불러오기” 교체 핸들러 ─────────────────
             $loadOtherBtn.addEventListener('click', ()=> {
@@ -538,6 +539,28 @@
               subscribeFriendData(other);
               loadFriendDeck(other);
             });
+
+              /* ── 체크 상태 초기화 (Reset) ───────────────── */
+              const $resetBtn = document.getElementById('reset-checks');
+              $resetBtn.addEventListener('click', async () => {
+                if (!confirm('모든 체크를 해제할까요?')) return;
+
+                // 1) UI에서 체크 표시 모두 제거
+                photoCards.forEach(img => img.classList.remove('checked'));
+
+                // 2) 로컬 스토리지 비우기
+                localStorage.removeItem('userData');
+
+                // 3) Firebase에도 빈 객체로 덮어쓰기
+                const uid = ensureMyUUID();
+                await set(ref(db, `users/${uid}/cards`), {});
+
+                // 4) 카운터 업데이트
+                updateCount();
+              });
+
+
+
 
              // ── “내 UUID 불러오기” 버튼 핸들러 복원
              document.getElementById('load-user-data')
