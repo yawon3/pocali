@@ -747,6 +747,13 @@
               img.dataset.version = image.version;
               img.dataset.unique  = image.unique_id;
 
+              // ── 로컬 저장소(userData)에 있던 체크 정보 재적용
+              const saved = JSON.parse(localStorage.getItem('userData') || '{}');
+              if (saved[image.unique_id]) {
+                img.classList.add('checked');
+              }
+
+
               // 3) 오버레이: image.type 또는 백엔드 file_type 활용
               const overlay = document.createElement('div');
               overlay.className   = 'image-overlay';
