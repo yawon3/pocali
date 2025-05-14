@@ -186,6 +186,7 @@
             let currentView       = 'id';
             let viewOwner         = 'self';
             let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
+            let userData = {}; 
 
             function $(s){ return document.querySelector(s); }
             function $$(s){ return Array.from(document.querySelectorAll(s)); }
