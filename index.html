@@ -188,8 +188,12 @@
             let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
             let userData = {}; 
 
-            function $(s){ return document.querySelector(s); }
-            function $$(s){ return Array.from(document.querySelectorAll(s)); }
+             function $(sel, scope=document) {
+               return scope.querySelector(sel);
+             }
+             function $$(sel, scope=document) {
+               return Array.from(scope.querySelectorAll(sel));
+             }
             // ── UUID & Firebase 동기화 함수 ─────────────────────
               function ensureMyUUID() {
                 let uid = localStorage.getItem('myUUID');
@@ -356,11 +360,12 @@
                ───────────────────────────────────────────── */
             /** 고유번호(ID) 내림차순 정렬 뷰 */
             function showById(list = null) {
-              const cards = (list ?? originalCards).slice();   // 복사본
-              cards.sort((a, b) =>
-                $('.photo-card', b).dataset.unique -
-                $('.photo-card', a).dataset.unique
-              );
+                const cards = (list ?? originalCards).slice();
+                cards.sort((a, b) => {
+                const imgB = b.querySelector('.photo-card');
+                const imgA = a.querySelector('.photo-card');
+                return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
+              });
               render(cards);
             }
           
