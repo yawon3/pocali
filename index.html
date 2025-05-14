@@ -165,6 +165,11 @@
           /* ───────────────────────────────────────────────
              0. 전역 상태 및 도우미
              ─────────────────────────────────────────────── */
+          // ─── 페이징용 전역 변수 ─────────────────────────
+          const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
+          let allImages      = [];       // 전체 이미지 메타데이터 저장
+          let currentBatch   = 0;        // 렌더된 배치 인덱스
+          let isRendering    = false;    // 중복 렌더링 방지 플래그
           let currentView       = 'id';      // 'id'  | 'category'
           let viewOwner         = 'self';    // 'self'| 'friend'
           let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
@@ -235,80 +240,15 @@
              let originalCards = [];
              let photoCards    = [];
           
-             
-            
-        async function fetchAndRenderImages() {
-           const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
-           // 로컬 grid 변수 선언
-           const grid = document.getElementById('photo-grid');
-           $grid.innerHTML = '';
-
-            images.forEach(image => {
-              const container = document.createElement('div');
-              container.className = 'photo-card-container';
-
-              const img = document.createElement('img');
-              img.className = 'photo-card';
-              img.src         = image.url.startsWith('http')
-                                  ? image.url
-                                  : `https://pocali-backend.onrender.com${image.url}`;
-              img.loading     = 'lazy';
-              img.alt         = `${image.group} ${image.member} ${image.category} ${image.title} ${image.version} #${image.unique_id}`;
-              img.dataset.group   = image.group;
-              img.dataset.member  = image.member;
-              img.dataset.category= image.category;
-              img.dataset.title   = image.title;
-              img.dataset.version = image.version;
-              img.dataset.unique  = image.unique_id;
-
-              container.appendChild(img);
-              if (image.type) {
-                const overlay = document.createElement('div');
-                overlay.className = 'image-overlay';
-                overlay.textContent = image.type;
-                container.appendChild(overlay);
-              }
-              $grid.appendChild(container);
-
-                    // ── 이미지별 이벤트 바인딩 (PC+모바일 모두)
-                let startTime, pressTimer;
-                img.addEventListener('pointerdown', e => {
-                  if (viewOwner !== 'self') return;
-                  startTime = performance.now();
-                  // 500ms 후에만 모달 띄우기
-                  pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-                });
-                img.addEventListener('pointerup', e => {
-                  clearTimeout(pressTimer);
-                  const delta = performance.now() - startTime;
-                  // 터치로 짧게 누르면 보유체크
-                  if (e.pointerType === 'touch' && delta < TAP_THRESHOLD) {
-                    toggleCheck(img);
-                  }
-                });
-                img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
-
-                // PC에서 더블클릭으로 보유체크
-                img.addEventListener('dblclick', () => {
-                  if (viewOwner !== 'self') return;
-                  toggleCheck(img);
-                });
-
-                // 우클릭(또는 모바일 롱프레스) 메뉴 차단 & 모달
-                img.addEventListener('contextmenu', e => {
-                  e.preventDefault();
-                  showModal(img);
-                });
-
-
-            });
-                  
-            // ① 렌더링된 이미지 캐시 갱신
-          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
-          photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
-
-      
-          }
+           async function fetchAndRenderImages() {
+              // 1) 전체 이미지 메타데이터만 불러와서 allImages에 저장
+              allImages = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+              // 2) 첫 배치 렌더링 전 초기화
+              currentBatch = 0;
+              $grid.innerHTML = '';
+              // 3) 첫 번째 배치(100장) 렌더링 호출
+              renderNextBatch();
+           }
           
           $searchInput.addEventListener('input', applyFilters);
 
@@ -778,8 +718,86 @@
               });
             }
 
+            // ─── 페이징별 렌더링 함수 ─────────────────────────
+             function renderNextBatch() {
+            if (isRendering) return;
+            isRendering = true;
+
+            const start = currentBatch * BATCH_SIZE;
+            const end   = start + BATCH_SIZE;
+            const slice = allImages.slice(start, end);
+
+            slice.forEach(image => {
+              // 1) 카드 컨테이너 생성
+              const container = document.createElement('div');
+              container.className = 'photo-card-container';
+
+              // 2) <img> 요소 생성
+              const img = document.createElement('img');
+              img.className       = 'photo-card';
+              img.src             = image.url.startsWith('http')
+                                    ? image.url
+                                    : `https://pocali-backend.onrender.com${image.url}`;
+              img.loading         = 'lazy';
+              img.alt             = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
+              img.dataset.group   = image.group;
+              img.dataset.member  = image.member;
+              img.dataset.category= image.category;
+              img.dataset.title   = image.title;
+              img.dataset.version = image.version;
+              img.dataset.unique  = image.unique_id;
+
+              // 3) (선택) 오버레이
+              const overlay = document.createElement('div');
+              overlay.className   = 'image-overlay';
+              overlay.textContent = image.type;
+              container.appendChild(overlay);
+
+              // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
+              let startTime, pressTimer;
+              img.addEventListener('pointerdown', e => {
+                if (viewOwner !== 'self') return;
+                startTime = performance.now();
+                pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+              });
+              img.addEventListener('pointerup', e => {
+                clearTimeout(pressTimer);
+                if (performance.now() - startTime < TAP_THRESHOLD) {
+                  toggleCheck(img);
+                }
+              });
+              img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+              img.addEventListener('dblclick', () => {
+                if (viewOwner !== 'self') return;
+                toggleCheck(img);
+              });
+              img.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                showModal(img);
+              });
+
+              // 5) 그리드에 추가
+              container.appendChild(img);
+              document.querySelector('#photo-grid').appendChild(container);
+            });
+
+            // 6) 상태 갱신
+            currentBatch++;
+            updateCount();
+            isRendering = false;
+          }
           
-          }); // DOMContentLoaded
+            // ─── 무한 스크롤 트리거 ─────────────────────────
+            window.addEventListener('scroll', () => {
+              const nearBottom = window.innerHeight + window.scrollY
+                               >= document.body.offsetHeight - 200;
+              if (nearBottom && currentBatch * BATCH_SIZE < allImages.length) {
+                renderNextBatch();
+              }
+            });
+             });
+              
+          
           </script>
                
       </body>
