@@ -191,9 +191,7 @@
              function $(sel, scope=document) {
                return scope.querySelector(sel);
              }
-             function $$(sel, scope=document) {
-               return Array.from(scope.querySelectorAll(sel));
-             }
+            
             // ── UUID & Firebase 동기화 함수 ─────────────────────
               function ensureMyUUID() {
                 let uid = localStorage.getItem('myUUID');
@@ -238,6 +236,24 @@
                 const LONG_PRESS    = 500;
                 const TAP_THRESHOLD = 200;
 
+                 // ── ➊ 상세정보 모달 열기 함수 (여기로 이동!)
+                 function showModal(img) {
+                   const modal     = $('#photo-modal');
+                   const modalImg  = $('#modal-image');
+                   const modalInfo = $('#modal-info');
+               
+                   modalImg.src = img.src;
+                   modalInfo.innerHTML = `
+                     <p>${img.dataset.group   || ''}</p>
+                     <p>${img.dataset.member  || ''}</p>
+                     <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+                     <p>${img.dataset.version || ''}</p>
+                     <p>#${img.dataset.unique}</p>
+                   `;
+                   modal.style.display = 'block';
+                 }
+
+
                 const $grid          = $('#photo-grid');
                 const $searchInput   = $('#search-input');
                 const $catToggleBtn  = $('#categoryToggleBtn');
@@ -267,8 +283,7 @@
                   $grid.innerHTML = '';
                   renderNextBatch();
                 }
-                  // ── ➊ 상세정보 모달 열기 함수 ─────────────────────────
-                  function showModal(img) { … }
+                
                 
                 function renderNextBatch() {
                   if (isRendering) return;
@@ -363,9 +378,8 @@
                ───────────────────────────────────────────── */
             /** 고유번호(ID) 내림차순 정렬 뷰 */
             function showById(list = null) {
-              const cards = (list ?? originalCards).slice();   // 복사본
+              const cards = (list ?? originalCards).slice();
               cards.sort((a, b) => {
-                // 각 div(photo-card-container) 안에서 .photo-card img를 찾습니다
                 const imgA = a.querySelector('.photo-card');
                 const imgB = b.querySelector('.photo-card');
                 return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
@@ -373,50 +387,53 @@
               render(cards);
             }
 
+
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
             function showByCategory() {
-              const q = $searchInput.value.toLowerCase();
+              const q = $('#search-input').value.toLowerCase();
 
-            // 1) 필터링
-            const filtered = originalCards.filter(div => {
-              const img = div.querySelector('.photo-card');
-              if (!img) return false;
-              const alt    = img.alt.toLowerCase();
-              const grp    = img.dataset.group.toLowerCase();
-              const mem    = img.dataset.member.toLowerCase();
-              const textOK = !q || alt.includes(q);
-              const grpOK  = !advancedFilters.groups.length ||
-                            advancedFilters.groups.includes(grp.toUpperCase());
-              const memOK  = !advancedFilters.members.length ||
-                            advancedFilters.members.some(v => mem.includes(v.toLowerCase()));
-              return textOK && grpOK && memOK;
-            });
+              // 1) 필터링
+              const filtered = originalCards.filter(div => {
+                const img = div.querySelector('.photo-card');
+                if (!img) return false;
+                const alt = img.alt.toLowerCase();
+                const g   = img.dataset.group.toLowerCase();
+                const m   = img.dataset.member.toLowerCase();
+                const ok1 = !q || alt.includes(q);
+                const ok2 = !advancedFilters.groups.length ||
+                            advancedFilters.groups.includes(g.toUpperCase());
+                const ok3 = !advancedFilters.members.length ||
+                            advancedFilters.members.some(v => m.includes(v.toLowerCase()));
+                return ok1 && ok2 && ok3;
+              });
 
-            // 2) 그룹핑
-            const buckets = {};
-            filtered.forEach(div => {
-              const img = div.querySelector('.photo-card');
-              const key = [ img.dataset.category||'미분류',
-                            img.dataset.title, img.dataset.version ]
-                          .filter(Boolean).join(' | ');
-              (buckets[key] = buckets[key] || []).push(div);
-            });
+              // 2) 그룹핑
+              const buckets = {};
+              filtered.forEach(div => {
+                const img = div.querySelector('.photo-card');
+                const key = [img.dataset.category, img.dataset.title, img.dataset.version]
+                            .filter(Boolean).join(' | ');
+                (buckets[key] = buckets[key] || []).push(div);
+              });
 
-            $grid.innerHTML = '';
+              // 3) 렌더링
+              $('#photo-grid').innerHTML = '';
               Object.entries(buckets)
-                .sort(([,cardsA],[,cardsB]) => {
-                  const aImg = cardsA[0].querySelector('.photo-card');
-                  const bImg = cardsB[0].querySelector('.photo-card');
-                  return Number(bImg.dataset.unique) - Number(aImg.dataset.unique);
+                .sort(([,a],[,b]) => {
+                  const ia = a[0].querySelector('.photo-card');
+                  const ib = b[0].querySelector('.photo-card');
+                  return Number(ib.dataset.unique) - Number(ia.dataset.unique);
                 })
                 .forEach(([hdr,cards]) => {
                   const h2 = document.createElement('h2');
-                  h2.textContent = hdr; $grid.appendChild(h2);
-                  cards.sort((a,b) => {
-                    const aImg = a.querySelector('.photo-card');
-                    const bImg = b.querySelector('.photo-card');
-                    return Number(bImg.dataset.unique) - Number(aImg.dataset.unique);
-                  }).forEach(d => $grid.appendChild(d));
+                  h2.textContent = hdr;
+                  h2.style.margin = '16px 0 8px';
+                  $('#photo-grid').appendChild(h2);
+                  cards.sort((x,y) => {
+                    const ix = x.querySelector('.photo-card');
+                    const iy = y.querySelector('.photo-card');
+                    return Number(iy.dataset.unique) - Number(ix.dataset.unique);
+                  }).forEach(d => $('#photo-grid').appendChild(d));
                 });
 
               updateCount();
@@ -518,7 +535,7 @@
             const $friendClose   = $('#friend-modal-close');
             const $friendConfirm = $('#friend-add-confirm');
 
-            const $resetBtn      = $('#reset-checks');
+            const resetBtn      = $('#reset-checks');
             const $exportBtn     = $('#export-sheet');     // (시트 모달 열기만)
 
             const $userDataModal      = $('#user-data-modal');
@@ -540,26 +557,15 @@
               loadFriendDeck(other);
             });
 
-              /* ── 체크 상태 초기화 (Reset) ───────────────── */
-              const $resetBtn = document.getElementById('reset-checks');
-              $resetBtn.addEventListener('click', async () => {
-                if (!confirm('모든 체크를 해제할까요?')) return;
-
-                // 1) UI에서 체크 표시 모두 제거
-                photoCards.forEach(img => img.classList.remove('checked'));
-
-                // 2) 로컬 스토리지 비우기
-                localStorage.removeItem('userData');
-
-                // 3) Firebase에도 빈 객체로 덮어쓰기
-                const uid = ensureMyUUID();
-                await set(ref(db, `users/${uid}/cards`), {});
-
-                // 4) 카운터 업데이트
-                updateCount();
-              });
-
-
+            document.addEventListener('DOMContentLoaded', () => {
+            const resetBtn = document.getElementById('reset-checks');
+            resetBtn.addEventListener('click', async () => {
+              if (!confirm('모든 체크를 해제할까요?')) return;
+              photoCards.forEach(img => img.classList.remove('checked'));
+              localStorage.removeItem('userData');
+              await set(ref(db, `users/${ensureMyUUID()}/cards`), {});
+              updateCount();
+            });
 
 
              // ── “내 UUID 불러오기” 버튼 핸들러 복원
