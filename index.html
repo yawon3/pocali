@@ -158,167 +158,160 @@
         <script type="module">
           import { initializeApp } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-app.js";
           import {
-            getDatabase,
-            ref,
-            set,
-            get,
-            onValue
+            getDatabase, ref, set, get, onValue
           } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
 
-          // ❶ 초기화
-          const app = initializeApp(firebaseConfig);
-          const db  = getDatabase(app);
-
-          // ❷ 읽기/쓰기 함수 정의
-          async function syncLocalDataToServer() {
-            const uid  = localStorage.getItem("myUUID");
-            if (!uid) return;
-            const data = JSON.parse(localStorage.getItem("userData") || "{}");
-            await set(ref(db, `users/${uid}`), data);
-          }
-
-          async function loadUserData() {
-            const uid = localStorage.getItem("otherUUID") || localStorage.getItem("myUUID");
-            if (!uid) return {};
-            const snapshot = await get(ref(db, `users/${uid}`));
-            if (snapshot.exists()) {
-              const data = snapshot.val();
-              localStorage.setItem("userData", JSON.stringify(data));
-              updateCount();
-              if (currentView === 'category') showByCategory();
-              else showById();
-              loadSelfDeck();
-              return data;
-            }
-            return {};
-          }
-
-          // ❸ 친구 데이터 실시간 구독 (선택)
-          let friendListener = null;
-          function subscribeFriendData(uuid) {
-            if (friendListener) friendListener();  // 이전 리스너 해제
-            const r = ref(db, `users/${uuid}`);
-            friendListener = onValue(r, snap => {
-              const data = snap.val() || {};
-              applyFriendData(data);
-            });
-          }
-        </script>
-
-        <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
-        <script>
-          /* ==========================================================
-             📌 pocalist 메인 스크립트
-             (2024-04-28 - 리팩터: 가독성 ↑ / 중복 ↓)
-             ========================================================== */
-          
-          /* ───────────────────────────────────────────────
-             0. 전역 상태 및 도우미
-             ─────────────────────────────────────────────── */
-          // ─── 페이징용 전역 변수 ─────────────────────────
-          const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
-          let allImages      = [];       // 전체 이미지 메타데이터 저장
-          let currentBatch   = 0;        // 렌더된 배치 인덱스
-          let isRendering    = false;    // 중복 렌더링 방지 플래그
-          let totalCount     = 0;        // ← 전체 개수 헤더에서 읽어 저장
-          let currentView       = 'id';      // 'id'  | 'category'
-          let viewOwner         = 'self';    // 'self'| 'friend'
-          let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
-          
+          let originalCards = [], photoCards = [];
           const advancedFilters = { groups: [], members: [] };
+
+          // ── Firebase 셋업 ─────────────────────────────────
+          const firebaseConfig = {
+            apiKey: "AIzaSyADRbVXqHqvIW35jyk4NAtt8i4sXTHDFBc",
+            authDomain: "pocali.firebaseapp.com",
+            databaseURL: "https://pocali-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "pocali",
+            storageBucket: "pocali.firebasestorage.app",
+            messagingSenderId: "460319369852",
+            appId: "1:460319369852:web:239f87cc192f4fa392b7f9",
+            measurementId: "G-66W2DWXB68"
+         };
+            const app = initializeApp(firebaseConfig);
+            const db  = getDatabase(app);
+
+            // ── 전역 상태 & 도우미 ───────────────────────────────
+            const BATCH_SIZE      = 100;
+            let allImages         = [];
+            let currentBatch      = 0;
+            let isRendering       = false;
+            let totalCount        = 0;
+            let currentView       = 'id';
+            let viewOwner         = 'self';
+            let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
+
+            function $(s){ return document.querySelector(s); }
+            function $$(s){ return Array.from(document.querySelectorAll(s)); }
+            // ── UUID & Firebase 동기화 함수 ─────────────────────
+              function ensureMyUUID() {
+                let uid = localStorage.getItem('myUUID');
+                if (!uid) {
+                  uid = crypto.randomUUID();
+                  localStorage.setItem('myUUID', uid);
+                  syncLocalDataToServer();
+                }
+                return uid;
+              }
+              async function syncLocalDataToServer() {
+                const uid  = ensureMyUUID();
+                const data = JSON.parse(localStorage.getItem('userData')||'{}');
+                await set(ref(db, `users/${uid}/cards`), data);
+              }
+              async function loadFriendDeck(uuid) {
+                const snap    = await get(ref(db, `users/${uuid}/cards`));
+                const friendData = snap.exists() ? snap.val() : {};
+                applyFriendData(friendData);
+                viewOwner         = 'friend';
+                currentFriendUUID = uuid;
+                localStorage.setItem('lastFriendUUID', uuid);
+                $('#view-toggle').textContent = '👤 내 카드보기';
+              }
+              function subscribeFriendData(uuid) {
+                return onValue(ref(db, `users/${uuid}/cards`), snap => {
+                  applyFriendData(snap.val()||{});
+                });
+              }
+
+              // ── applyFriendData (친구 보유 체크만 렌더) ───────────
+              function applyFriendData(data) {
+                photoCards.forEach(img => {
+                  img.classList.toggle('checked', !!data[img.dataset.unique]);
+                  img.style.pointerEvents = 'none';
+                });
+              }
+
+              // ── DOMContentLoaded 이후 초기화 ─────────────────────
+              document.addEventListener('DOMContentLoaded', () => {
+                const LONG_PRESS    = 500;
+                const TAP_THRESHOLD = 200;
+
+                const $grid          = $('#photo-grid');
+                const $searchInput   = $('#search-input');
+                const $catToggleBtn  = $('#categoryToggleBtn');
+                const $viewToggleBtn = $('#view-toggle');
+                const $loadOtherBtn  = $('#load-other-data');
+                
+                function toggleCheck(img) {
+                  img.classList.toggle('checked');
+                  const data = JSON.parse(localStorage.getItem('userData')||'{}');
+                  data[img.dataset.unique] = img.classList.contains('checked');
+                  localStorage.setItem('userData', JSON.stringify(data));
+                  syncLocalDataToServer();
+                  updateCount();
+                }
+
+                  const $myUuidInput = document.getElementById('my-uuid');
+                  $myUuidInput.value = ensureMyUUID();
+
+
+                // ── 메인 렌더링/페이징 함수 정의 ─────────────────────
+                async function fetchAndRenderImages() {
+                  // (1) 전체 메타데이터 → allImages
+                  const resp      = await fetch('https://pocali-backend.onrender.com/api/images');
+                  allImages       = await resp.json();
+                  totalCount      = allImages.length;
+                  currentBatch    = 0;
+                  $grid.innerHTML = '';
+                  renderNextBatch();
+                }
+                function renderNextBatch() {
+                  if (isRendering) return;
+                  isRendering = true;
+                  const start = currentBatch * BATCH_SIZE;
+                  const slice = allImages.slice(start, start + BATCH_SIZE);
+                  if (!slice.length) { isRendering=false; return; }
+                  slice.forEach(image => {
+                    const container = document.createElement('div');
+                    container.className = 'photo-card-container';
+                    const img = document.createElement('img');
+                    img.className       = 'photo-card';
+                    img.src             = image.url;
+                    img.dataset.unique  = image.unique_id;
+                    // 로컬 체크 복원
+                    if (JSON.parse(localStorage.getItem('userData')||'{}')[image.unique_id]) {
+                      img.classList.add('checked');
+                    }
+                    // 오버레이
+                    const ov = document.createElement('div');
+                    ov.className   = 'image-overlay';
+                    ov.textContent = image.type||image.file_type||'';
+                    container.append(ov, img);
+                    // 이벤트 바인딩
+                    img.addEventListener('dblclick', ()=> viewOwner==='self' && toggleCheck(img));
+                    let startT, timer;
+                    img.addEventListener('pointerdown', () => {
+                      startT = performance.now();
+                      timer  = setTimeout(()=>showModal(img), LONG_PRESS);
+                    });
+                    img.addEventListener('pointerup', e=>{
+                      clearTimeout(timer);
+                      if (performance.now()-startT < TAP_THRESHOLD) toggleCheck(img);
+                    });
+                    img.addEventListener('pointerleave', ()=>clearTimeout(timer));
+                    container.appendChild(img);
+                    $grid.appendChild(container);
+                  });
+                  originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+                  photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
+                  currentBatch++;
+                  updateCount();
+                  applyFilters();
+                  isRendering = false;
+                }
+                window.addEventListener('scroll', ()=>{
+                  if (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-50) {
+                    renderNextBatch();
+                  }
+                });
           
-          /* 짧은 셀렉터 도우미 */
-          function $(sel,  scope=document) { return scope.querySelector(sel); }
-          function $$(sel, scope=document) { return Array.from(scope.querySelectorAll(sel)); }
-
-          /* ── 공통: 이미지 상세 모달 ───────────────────────── */
-          function showModal(img) {
-            const $modal      = $('#photo-modal');
-            const $modalImg   = $('#modal-image');
-            const $modalInfo  = $('#modal-info');
-
-            $modalImg.src = img.src;
-
-            $modalInfo.innerHTML = `
-              <p>${img.dataset.group   || ''}</p>
-              <p>${img.dataset.member  || ''}</p>
-              <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
-              <p>${img.dataset.version || ''}</p>
-              <p>#${img.dataset.unique}</p>
-            `;
-
-            $modal.style.display = 'block';
-          }
-            // 모달 전체에서 우클릭 메뉴 차단
-            $('#photo-modal').addEventListener('contextmenu', e => e.preventDefault());
-
-            // 모달 안 이미지에서도 우클릭 메뉴 차단
-            $('#modal-image').addEventListener('contextmenu', e => e.preventDefault());
-
-
-
-          /* X 버튼 -or- 바깥 클릭 → 모달 닫기 */
-          $('#modal-close').addEventListener('click', () => $('#photo-modal').style.display = 'none');
-          $('#photo-modal').addEventListener('click', e => {
-            if (e.target === $('#photo-modal')) $('#photo-modal').style.display = 'none';
-          });
-
-
-          
-          /* ───────────────────────────────────────────────
-             1. DOMContentLoaded 이후 초기화
-             ─────────────────────────────────────────────── */
-           document.addEventListener('DOMContentLoaded', () => {
-            const LONG_PRESS     = 500;
-            const TAP_THRESHOLD  = 200;
-            const MOVE_THRESHOLD = 10;
-
-             function toggleCheck(img) {
-               img.classList.toggle('checked');
-               const data = JSON.parse(localStorage.getItem('userData') || '{}');
-               data[img.dataset.unique] = img.classList.contains('checked');
-               localStorage.setItem('userData', JSON.stringify(data));
-               syncLocalDataToServer();
-               updateCount();
-             }
-            // ── ❶ toggleCheck 함수 정의 ...
-             const $grid          = $('#photo-grid');
-             const $viewToggleBtn = $('#view-toggle');
-             const $catToggleBtn  = $('#categoryToggleBtn');
-             const $searchInput   = $('#search-input');
-
-             // 0. 렌더링 후에 값을 채울 변수들은 let 으로
-             let originalCards = [];
-             let photoCards    = [];
-          
-           async function fetchAndRenderImages() {
-               // 1) 전체 이미지 메타데이터 + 전체 개수 가져오기
-              const resp    = await fetch('https://pocali-backend.onrender.com/api/images');
-              allImages     = await resp.json();
-              totalCount    = allImages.length;
-              // 2) 첫 배치 렌더링 전 초기화
-              currentBatch = 0;
-              $grid.innerHTML = '';
-              // 3) 첫 번째 배치(100장) 렌더링 호출
-              renderNextBatch();
-           }
-          
-          $searchInput.addEventListener('input', applyFilters);
-
-          $viewToggleBtn.addEventListener('click', () => {
-            if (viewOwner === 'friend') loadSelfDeck();
-            else if (currentFriendUUID) loadFriendDeck(currentFriendUUID);
-            else alert('먼저 친구를 추가하세요!');
-          });
-
-
-          // 이제야 한 번만 이미지를 불러옵니다.
-          fetchAndRenderImages()
-            .catch(console.error);
-   
-
-                    
             /* ─────────────────────────────────────────────
                2. 공통 유틸
                ───────────────────────────────────────────── */
@@ -482,24 +475,7 @@
             showById();          // 기본 정렬
             loadSelfDeck();       // ✅ 보유표시도 함께!
             updateCount();       // 카운터 초기화
-            /* 🔻 ❹ 서버→클라이언트 10초 폴링 ------------------------*/
-            async function pollServerData () {
-              if (viewOwner !== 'self') return;           // 친구 보기 땐 건너뜀
-            
-              const me = localStorage.getItem('myUUID');
-              if (!me) return;
-            
-              const r = await fetch(`/api/user/${me}`);
-              if (!r.ok) return;
-              userData = JSON.parse((await r.json()).data || '{}');
-              localStorage.setItem('userData', JSON.stringify(userData));
-            
-              photoCards.forEach(img =>
-                img.classList.toggle('checked', !!userData[img.dataset.unique]));
-              updateCount();
-            }
-            setInterval(pollServerData, 10_000);
-            /* ------------------------------------------------------*/
+          
             /* ── 5-A. 우측 FAB & 모달 보조 기능 ─────────────────────────── */
             const $fab           = $('#fab');
             const $userModal     = $('#user-modal');
@@ -521,66 +497,15 @@
               if (e.target === $userDataModal) $userDataModal.style.display = 'none';
             });
 
-             // ── 1) 디바이스당 UUID 발급 (회원가입 불필요)
-             function ensureMyUUID() {
-               let uid = localStorage.getItem('myUUID');
-               if (!uid) {
-                 uid = crypto.randomUUID();
-                 localStorage.setItem('myUUID', uid);
-                 syncLocalDataToServer();  // 빈 데이터라도 바로 올려 두기
-               }
-               return uid;
-             }
-           
-             // ── 2) 내 체크 데이터만 Firebase에 쓰기
-             async function syncLocalDataToServer() {
-               const uid  = ensureMyUUID();
-               const data = JSON.parse(localStorage.getItem('userData') || '{}');
-               await set(ref(db, `users/${uid}/cards`), data);
-             }
-           
-             // ── 3) 친구 UUID 경로에서 읽기만 수행
-             async function loadFriendDeck(uuid) {
-               const snapshot = await get(ref(db, `users/${uuid}/cards`));
-               const friendData = snapshot.exists() ? snapshot.val() : {};
-               applyFriendData(friendData);
-           
-               viewOwner         = 'friend';
-               currentFriendUUID = uuid;
-               localStorage.setItem('lastFriendUUID', uuid);
-               $viewToggleBtn.textContent = '👤 내 카드보기';
-             }
-
-
-
-            /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
-            $('#load-other-data')?.addEventListener('click', async () => {
+            
+            // ── “다른 UUID 불러오기” 교체 핸들러 ─────────────────
+            $loadOtherBtn.addEventListener('click', ()=> {
               const other = $('#other-uuid').value.trim();
               if (!other) return alert('UUID를 입력하세요!');
-              const r = await fetch(`/api/user/${other}`);
-              if (!r.ok) return alert('해당 UUID를 찾을 수 없습니다.');
-              const json = await r.json();
-              localStorage.setItem('userData', json.data);
-              localStorage.setItem('myUUID',   other);
-              location.reload();                 // ← 바로 적용
+              // 친구 실시간 구독 + 그리기
+              subscribeFriendData(other);
+              loadFriendDeck(other);
             });
-            /* -------------------------------------------------------*/
-            /* 🔻 ❺-B : 유저 데이터 모달 & 서버 동기화 ----------------------- */
-            const $loadUserBtn  = $('#load-user-data');      // ① “유저 데이터 불러오기”
-
-            
-            // 3) “유저 데이터 불러오기” 버튼 클릭 시 모달 열기
-            $loadUserBtn?.addEventListener('click', async () => {
-              $userModal.style.display = 'none';          // 기존 모달 닫기
-              const me = await ensureMyUUID();            // UUID 확보/표시
-              $('#my-uuid').value    = me;
-              $('#other-uuid').value = '';
-              $('#uuid-msg').textContent = '';
-              $('#user-data-modal').style.display = 'block';
-            });
-            /* ------------------------------------------------------------- */
-
-
 
 
             /* ① FAB 눌러 → ‘유저 설정’ 모달 */
@@ -598,44 +523,6 @@
             $friendClose.addEventListener('click', () => $friendModal.style.display = 'none');
             $friendModal.addEventListener('click', e => { if (e.target === $friendModal) $friendModal.style.display = 'none'; });
 
-            $friendConfirm.addEventListener('click', async () => {
-              const me     = localStorage.getItem('myUUID');
-              const friend = $('#friend-uuid').value.trim();
-              if (!me || !friend) { alert('UUID를 입력하세요!'); return; }
-
-              const ok = await fetch('/api/friends', {
-                method : 'POST',
-                headers: { 'Content-Type':'application/json' },
-                body   : JSON.stringify({ me, friend })
-              }).then(r => r.ok);
-
-              if (!ok) return alert('등록 실패');
-
-              localStorage.setItem('lastFriendUUID', friend);
-              $friendModal.style.display = 'none';
-              loadFriendDeck(friend);
-              alert('친구 등록 완료!');
-            });
-
-            /* ③ 체크 상태 초기화 */
-            $resetBtn.addEventListener('click', async () => {      // ← async 로 변경
-              if (!confirm('모든 체크를 해제할까요?')) return;
-
-              // 1) 화면-로컬 초기화
-              $$('.photo-card').forEach(img => img.classList.remove('checked'));
-              localStorage.removeItem('userData');
-              updateCount();
-
-              // 2) 서버에도 빈 데이터 업로드  ← ★ 이 두 줄 추가
-              const me = localStorage.getItem('myUUID');
-              if (me) {
-                await fetch(`/api/user/${me}`, {
-                  method : 'POST',
-                  headers: { 'Content-Type':'application/json' },
-                  body   : JSON.stringify({ data: {} })
-                });
-              }
-            });
 
             /* ④ 시트(프린트) 모달 열기 */
             $exportBtn.addEventListener('click', () => {
@@ -851,10 +738,16 @@
                 renderNextBatch();
               }
             });
-             });
+         
               
           
-          </script>
+                // ── 초기화 흐름 ──────────────────────────────────────
+         ensureMyUUID();
+         await loadUserData();           // ← 여기를 활성화!
+         fetchAndRenderImages();
+        });
+        
+      </script>
                
       </body>
       </html>
