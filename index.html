@@ -220,20 +220,6 @@
                 });
               }
 
-              // ── (추가) 내 체크 데이터 Firebase에서 복원 ─────────────────
-              async function loadUserData() {
-                const uid = ensureMyUUID();                        // 기존 함수
-                const snap = await get(ref(db, `users/${uid}/cards`));
-                if (snap.exists()) {
-                  const data = snap.val();
-                  localStorage.setItem('userData', JSON.stringify(data));
-                  // 화면 갱신
-                  updateCount();
-                  if (currentView === 'category') showByCategory();
-                  else showById();
-                  loadSelfDeck();
-                }
-              }
 
               // ── applyFriendData (친구 보유 체크만 렌더) ───────────
               function applyFriendData(data) {
@@ -321,6 +307,9 @@
                   applyFilters();
                   isRendering = false;
                 }
+
+
+
                 window.addEventListener('scroll', ()=>{
                   if (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-50) {
                     renderNextBatch();
@@ -338,6 +327,22 @@
               // “전체”는 헤더에서 읽은 totalCount
               document.getElementById('count-display').textContent = `${have} / ${totalCount}`;
             }
+
+               // ── (추가) 내 체크 데이터 Firebase에서 복원 ─────────────────
+                async function loadUserData() {
+                const uid = ensureMyUUID();                        // 기존 함수
+                const snap = await get(ref(db, `users/${uid}/cards`));
+                if (snap.exists()) {
+                  const data = snap.val();
+                  localStorage.setItem('userData', JSON.stringify(data));
+                  // 화면 갱신
+                  updateCount();
+                  if (currentView === 'category') showByCategory();
+                  else showById();
+                  loadSelfDeck();
+                }
+              }
+
           
             /** 카드 리스트를 그리드에 그대로 렌더링 */
             function render(cards) {
@@ -756,10 +761,10 @@
          
               
           
-                // ── 초기화 흐름 ──────────────────────────────────────
-         ensureMyUUID();
-         await loadUserData();           // ← 여기를 활성화!
-         fetchAndRenderImages();
+         // ── 초기화 흐름 ──────────────────────────────────────
+            ensureMyUUID();
+            await loadUserData();           // ← 콜백 내부에서만 호출
+            fetchAndRenderImages();
 
         });
         
