@@ -787,18 +787,21 @@
               container.appendChild(img);
               $grid.appendChild(container);
             });
-            // ── 렌더 후 캐시 갱신 (카테고리뷰·체크 토글·카운터용)
+              // — 캐시 갱신
             originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
             photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
 
-            // 6) 상태 갱신
+            // — 상태 갱신
             if (currentBatch === 0) {
-              // 첫 배치 이후에도 항상 allImages.length 를 분모로 사용
               totalCount = allImages.length;
             }
             currentBatch++;
             updateCount();
-            isRendering = false;
+
+            // — 현재 뷰(ID/카테고리)에 맞춰 재렌더
+            applyFilters();
+
+            isRendering = false; 
           }
           
             // ─── 무한 스크롤 트리거 ─────────────────────────
