@@ -369,12 +369,11 @@
               const query = ($searchInput.value || '').toLowerCase();
               // originalCards 가 방금 렌더된 컨테이너들을 가리키고 있어야 합니다.
               /* (1) 필터링 */
-               const filtered = originalCards.filter(div => {
-               // div 내부에서 .photo-card를 찾도록 바꿉니다
-               const img    = div.querySelector('.photo-card');
-               const alt    = img.alt.toLowerCase();
-               const group  = img.dataset.group.toLowerCase();
-               const member = img.dataset.member.toLowerCase();
+              const filtered = originalCards.filter(div => {
+              const img    = div.querySelector('.photo-card');
+              const alt    = img.alt.toLowerCase();
+              const group  = img.dataset.group.toLowerCase();
+              const member = img.dataset.member.toLowerCase();
           
                 const textOK   = !query || alt.includes(query);
                 const groupOK  = !advancedFilters.groups.length ||
@@ -400,12 +399,11 @@
               /* (3) 헤더 + 카드 렌더링 */
               $grid.innerHTML = '';
               Object.entries(buckets)
-             .sort(([,a],[,b]) => {
-                // 헤더별 첫 카드 안에서 .photo-card를 찾도록 바꿉니다
-                const imgA = a[0].querySelector('.photo-card');
-                const imgB = b[0].querySelector('.photo-card');
-                return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
-              })
+                 .sort(([,a],[,b]) => {
+                  const imgA = a[0].querySelector('.photo-card');
+                  const imgB = b[0].querySelector('.photo-card');
+                  return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
+                })
                 .forEach(([header, cards]) => {
                   const h2 = document.createElement('h2');
                   h2.textContent   = header;
@@ -413,9 +411,9 @@
                   $grid.appendChild(h2);
           
                   cards.sort((a, b) =>
-                    +$('.photo-card', b).dataset.unique -
-                    +$('.photo-card', a).dataset.unique
-                  ).forEach(div => $grid.appendChild(div));
+                   Number(b[0].querySelector('.photo-card').dataset.unique) -
+                   Number(a[0].querySelector('.photo-card').dataset.unique)
+                   ).forEach(div => $grid.appendChild(div));
                 });
           
               updateCount();
@@ -441,7 +439,7 @@
 
                 return textOK && groupOK && memberOK;
               });
-              if (currentView === 'category') showByCategory(filtered);
+              if (currentView === 'category') showByCategory();
               else                            showById(filtered);
             }
 
