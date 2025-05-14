@@ -530,6 +530,16 @@
               loadFriendDeck(other);
             });
 
+             // ── “내 UUID 불러오기” 버튼 핸들러 복원
+             document.getElementById('load-user-data')
+               .addEventListener('click', () => {
+                 const uid = ensureMyUUID();
+                 document.getElementById('my-uuid').value = uid;
+                 document.getElementById('user-data-modal').style.display = 'block';
+                 document.getElementById('uuid-msg').textContent = '';
+               });
+
+
 
             /* ① FAB 눌러 → ‘유저 설정’ 모달 */
             $fab.addEventListener('click', () => $userModal.style.display = 'block');
