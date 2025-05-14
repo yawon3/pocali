@@ -220,6 +220,21 @@
                 });
               }
 
+              // ── (추가) 내 체크 데이터 Firebase에서 복원 ─────────────────
+              async function loadUserData() {
+                const uid = ensureMyUUID();                        // 기존 함수
+                const snap = await get(ref(db, `users/${uid}/cards`));
+                if (snap.exists()) {
+                  const data = snap.val();
+                  localStorage.setItem('userData', JSON.stringify(data));
+                  // 화면 갱신
+                  updateCount();
+                  if (currentView === 'category') showByCategory();
+                  else showById();
+                  loadSelfDeck();
+                }
+              }
+
               // ── applyFriendData (친구 보유 체크만 렌더) ───────────
               function applyFriendData(data) {
                 photoCards.forEach(img => {
@@ -229,7 +244,7 @@
               }
 
               // ── DOMContentLoaded 이후 초기화 ─────────────────────
-              document.addEventListener('DOMContentLoaded', () => {
+              ocument.addEventListener('DOMContentLoaded', async () => {
                 const LONG_PRESS    = 500;
                 const TAP_THRESHOLD = 200;
 
@@ -745,6 +760,7 @@
          ensureMyUUID();
          await loadUserData();           // ← 여기를 활성화!
          fetchAndRenderImages();
+
         });
         
       </script>
