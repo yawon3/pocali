@@ -369,12 +369,12 @@
               const query = ($searchInput.value || '').toLowerCase();
               // originalCards 가 방금 렌더된 컨테이너들을 가리키고 있어야 합니다.
               /* (1) 필터링 */
-              const filtered = originalCards.filter(div => {
-               // div 내부에서 .photo-card 찾기
-               const img = div.querySelector('.photo-card');
-                const alt    = img.alt.toLowerCase();
-                const group  = img.dataset.group.toLowerCase();
-                const member = img.dataset.member.toLowerCase();
+               const filtered = originalCards.filter(div => {
+               // div 내부에서 .photo-card를 찾도록 바꿉니다
+               const img    = div.querySelector('.photo-card');
+               const alt    = img.alt.toLowerCase();
+               const group  = img.dataset.group.toLowerCase();
+               const member = img.dataset.member.toLowerCase();
           
                 const textOK   = !query || alt.includes(query);
                 const groupOK  = !advancedFilters.groups.length ||
@@ -388,7 +388,7 @@
               /* (2) 그룹핑 ( category | title | version )*/
               const buckets = {};
               filtered.forEach(div => {
-                const img  = $('.photo-card', div);
+                const img  = div.querySelector('.photo-card');
                 const key  = [
                   img.dataset.category || '미분류',
                   img.dataset.title    || '',
@@ -400,12 +400,12 @@
               /* (3) 헤더 + 카드 렌더링 */
               $grid.innerHTML = '';
               Object.entries(buckets)
-                .sort(([,a],[,b]) => {
-                  // 헤더별 첫 카드 내부에서 다시 찾기
-                  const imgB = b[0].querySelector('.photo-card');
-                  const imgA = a[0].querySelector('.photo-card');
-                  return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
-                })
+             .sort(([,a],[,b]) => {
+                // 헤더별 첫 카드 안에서 .photo-card를 찾도록 바꿉니다
+                const imgA = a[0].querySelector('.photo-card');
+                const imgB = b[0].querySelector('.photo-card');
+                return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
+              })
                 .forEach(([header, cards]) => {
                   const h2 = document.createElement('h2');
                   h2.textContent   = header;
@@ -426,8 +426,9 @@
                 /* ② 공통 필터(검색어 + 상세조건) 한 번만 계산 */
               const query = ($searchInput.value || '').toLowerCase();
 
-              const filtered = originalCards.filter(div => {
-                const img    = $('.photo-card', div);
+               const filtered = originalCards.filter(div => {
+                // div 내부에서 .photo-card 찾기
+                const img    = div.querySelector('.photo-card');
                 const alt    = img.alt.toLowerCase();
                 const group  = img.dataset.group.toLowerCase();
                 const member = img.dataset.member.toLowerCase();
