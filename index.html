@@ -170,6 +170,7 @@
           let allImages      = [];       // 전체 이미지 메타데이터 저장
           let currentBatch   = 0;        // 렌더된 배치 인덱스
           let isRendering    = false;    // 중복 렌더링 방지 플래그
+          let totalCount     = 0;        // ← 전체 개수 헤더에서 읽어 저장
           let currentView       = 'id';      // 'id'  | 'category'
           let viewOwner         = 'self';    // 'self'| 'friend'
           let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
@@ -270,10 +271,11 @@
                ───────────────────────────────────────────── */
             /** 현재 화면의 총 카드수 / 보유카드수 표시 */
             function updateCount () {
-              const visible = originalCards.filter(card => card.offsetParent !== null);
-              const have    = visible.filter(card =>
-                               $('.photo-card', card).classList.contains('checked'));
-              $('#count-display').textContent = `${have.length} / ${visible.length}`;
+              // “보유됨”은 로컬 userData 에 true인 것의 개수
+              const data = JSON.parse(localStorage.getItem('userData') || '{}');
+              const have = Object.values(data).filter(v => v).length;
+              // “전체”는 헤더에서 읽은 totalCount
+              document.getElementById('count-display').textContent = `${have} / ${totalCount}`;
             }
           
             /** 카드 리스트를 그리드에 그대로 렌더링 */
@@ -299,7 +301,7 @@
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
             function showByCategory () {
               const query = ($searchInput.value || '').toLowerCase();
-          
+              // originalCards 가 방금 렌더된 컨테이너들을 가리키고 있어야 합니다.
               /* (1) 필터링 */
               const filtered = originalCards.filter(div => {
                 const img    = $('.photo-card', div);
@@ -743,10 +745,10 @@
               img.dataset.version = image.version;
               img.dataset.unique  = image.unique_id;
 
-              // 3) (선택) 오버레이
+              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
               const overlay = document.createElement('div');
               overlay.className   = 'image-overlay';
-              overlay.textContent = image.type;
+              overlay.textContent = image.type || image.file_type || '';
               container.appendChild(overlay);
 
               // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
@@ -774,12 +776,19 @@
 
               // 5) 그리드에 추가
               container.appendChild(img);
-              document.querySelector('#photo-grid').appendChild(container);
+              $grid.appendChild(container);
             });
+            // ── 렌더 후 캐시 갱신 (카테고리뷰·체크 토글·카운터용)
+            originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+            photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
 
             // 6) 상태 갱신
+            // header에서 한 번만 전체 개수 읽기
+            if (currentBatch === 0 && res) {
+              totalCount = parseInt(res.headers.get('X-Total-Count') || allImages.length, 10);
+            }
             currentBatch++;
-            updateCount();
+             updateCount();
             isRendering = false;
           }
           
