@@ -220,6 +220,21 @@
              1. DOMContentLoaded 이후 초기화
              ─────────────────────────────────────────────── */
            document.addEventListener('DOMContentLoaded', () => {
+              // ── export-modal 닫기 핸들러 (딱 한 번)
+              const $exportModal      = document.getElementById('export-modal');
+              const $exportModalClose = document.getElementById('export-modal-close');
+            
+              // × 아이콘 클릭 시
+              $exportModalClose.addEventListener('click', () => {
+                $exportModal.style.display = 'none';
+              });
+              // 모달 바깥(overlay) 클릭 시
+               $exportModal.addEventListener('click', e => {
+                 if (e.target === $exportModal) {
+                   $exportModal.style.display = 'none';
+                 }
+               });  // ← 이 줄을 꼭 추가!
+              
             const LONG_PRESS     = 500;
             const TAP_THRESHOLD  = 200;
             const MOVE_THRESHOLD = 10;
@@ -542,15 +557,13 @@
              });
 
              // ✅ 올바른 코드: export-form 값을 기준으로 allImages에서 필터
-             const $exportForm  = document.getElementById('export-form');
-             const $exportModal = document.getElementById('export-modal'); 
-             $exportForm.addEventListener('submit', e => {
+                $exportForm.addEventListener('submit', e => {
                 e.preventDefault();
                 const fd      = new FormData($exportForm);
                 const group   = fd.get('group');
                 const members = fd.getAll('member');
 
-                const sel = allImages.filter(meta =>
+                const sel = backupAllImages.filter(meta =>
                   meta.group === group &&
                   (members.length === 0 || members.includes(meta.member))
                 );
@@ -575,20 +588,11 @@
                 return img;
               });
 
-                            // ── export-modal 닫기 핸들러 ─────────────────────────────────
-              const $exportModalClose = document.getElementById('export-modal-close');
-              $exportModalClose.addEventListener('click', () => {
-                document.getElementById('export-modal').style.display = 'none';
-              });
-              // 바깥 클릭해도 닫히게 (선택)
-              const $exportModal = document.getElementById('export-modal');
-              $exportModal.addEventListener('click', e => {
-                if (e.target === $exportModal) $exportModal.style.display = 'none';
-              });
-            
-                 $exportModal.style.display = 'none';
-                  generateImageSheet(nodes);
-                });
+          
+              // 3) 모달 숨기고 시트 생성
+              $exportModal.style.display = 'none';
+              generateImageSheet(nodes);
+            });
                
 
             /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
