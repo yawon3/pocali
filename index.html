@@ -556,6 +556,9 @@
                detailModal.style.display = 'none';
              });
 
+              // ── export-form 요소 가져오기 (이 줄이 빠져 있었습니다)
+              const $exportForm = document.getElementById('export-form');
+
              // ✅ 올바른 코드: export-form 값을 기준으로 allImages에서 필터
                 $exportForm.addEventListener('submit', e => {
                 e.preventDefault();
