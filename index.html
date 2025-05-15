@@ -589,8 +589,7 @@
                  $exportModal.style.display = 'none';
                   generateImageSheet(nodes);
                 });
-                overlay.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
-
+               
 
             /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
             $('#load-other-data')?.addEventListener('click', async () => {
@@ -729,6 +728,9 @@
                  position:fixed; inset:0; background:#fff; z-index:9999;
                  overflow:auto; padding:20px;
                `;
+
+             // overlay 스크롤 전파 차단 (내부만 스크롤 되게)
+             overlay.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
 
               /* 4-2. 그리드 */
               const grid = document.createElement('div');
