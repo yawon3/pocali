@@ -558,8 +558,8 @@
             });
 
               /* ── 체크 상태 초기화 (Reset) ───────────────── */
-              const resetBtn = document.getElementById('reset-checks');
-              resetBtn.addEventListener('click', async () => {
+                // 이미 선언된 resetBtn 변수를 그대로 씁니다
+                resetBtn.addEventListener('click', async () => {
                 if (!confirm('모든 체크를 해제할까요?')) return;
                 photoCards.forEach(img => img.classList.remove('checked'));
                 localStorage.removeItem('userData');
