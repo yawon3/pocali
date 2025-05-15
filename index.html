@@ -167,6 +167,7 @@
              ─────────────────────────────────────────────── */
           // ─── 페이징용 전역 변수 ─────────────────────────
           const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
+          let backupAllImages = [];       // allImages 원본 백업용
           let allImages      = [];       // 전체 이미지 메타데이터 저장
           let currentBatch   = 0;        // 렌더된 배치 인덱스
           let isRendering    = false;    // 중복 렌더링 방지 플래그
@@ -245,6 +246,7 @@
                // 1) 전체 이미지 메타데이터 + 전체 개수 가져오기
               const resp = await fetch('https://pocali-backend.onrender.com/api/images');
               allImages     = await resp.json();
+              backupAllImages = allImages.slice();   // ← 원본 백업
               totalCount    = allImages.length;
               // 2) 첫 배치 렌더링 전 초기화
               currentBatch = 0;
@@ -253,7 +255,22 @@
               renderNextBatch();
            }
           
-          $searchInput.addEventListener('input', applyFilters);
+           $searchInput.addEventListener('input', e => {
+             const q = e.target.value.trim().toLowerCase();
+             // empty 시 원본 복구, 아니면 필터링
+             if (!q) {
+               allImages = backupAllImages.slice();
+             } else {
+               allImages = backupAllImages.filter(meta =>
+                 (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
+                   .toLowerCase().includes(q)
+               );
+             }
+             // 페이징 초기화 후 다시 렌더
+             currentBatch = 0;
+             $grid.innerHTML = '';
+             renderNextBatch();
+          });
 
           $viewToggleBtn.addEventListener('click', () => {
             if (viewOwner === 'friend') loadSelfDeck();
@@ -532,6 +549,9 @@
                   const img = document.createElement('img');
                   img.className       = 'photo-card';
                   img.src             = meta.url;
+                  // 보유 여부 반영
+                  const ud = JSON.parse(localStorage.getItem('userData')||'{}');
+                  if (ud[meta.unique_id]) img.classList.add('checked');
                   img.alt             = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
                   img.dataset.unique  = meta.unique_id;
                   img.dataset.group   = meta.group;
