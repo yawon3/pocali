@@ -154,217 +154,191 @@
             </div>
         </div>
        <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
-        
-        <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-        import { getDatabase, ref, set, get, onValue }
-          from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+        <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-          let originalCards = [], photoCards = [];
+        <script>
+          /* ==========================================================
+             📌 pocalist 메인 스크립트
+             (2024-04-28 - 리팩터: 가독성 ↑ / 중복 ↓)
+             ========================================================== */
+          
+          /* ───────────────────────────────────────────────
+             0. 전역 상태 및 도우미
+             ─────────────────────────────────────────────── */
+          let currentView       = 'id';      // 'id'  | 'category'
+          let viewOwner         = 'self';    // 'self'| 'friend'
+          let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
+          
           const advancedFilters = { groups: [], members: [] };
+          
+          /* 짧은 셀렉터 도우미 */
+          function $(sel,  scope=document) { return scope.querySelector(sel); }
+          function $$(sel, scope=document) { return Array.from(scope.querySelectorAll(sel)); }
 
-          // ── Firebase 셋업 ─────────────────────────────────
-          const firebaseConfig = {
-            apiKey: "AIzaSyADRbVXqHqvIW35jyk4NAtt8i4sXTHDFBc",
-            authDomain: "pocali.firebaseapp.com",
-            databaseURL: "https://pocali-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "pocali",
-            storageBucket: "pocali.firebasestorage.app",
-            messagingSenderId: "460319369852",
-            appId: "1:460319369852:web:239f87cc192f4fa392b7f9",
-            measurementId: "G-66W2DWXB68"
-         };
-            const app = initializeApp(firebaseConfig);
-            const db  = getDatabase(app);
+          /* ── 공통: 이미지 상세 모달 ───────────────────────── */
+          function showModal(img) {
+            const $modal      = $('#photo-modal');
+            const $modalImg   = $('#modal-image');
+            const $modalInfo  = $('#modal-info');
 
-            // ── 전역 상태 & 도우미 ───────────────────────────────
-            const BATCH_SIZE      = 100;
-            let allImages         = [];
-            let currentBatch      = 0;
-            let isRendering       = false;
-            let totalCount        = 0;
-            let currentView       = 'id';
-            let viewOwner         = 'self';
-            let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
-            let userData = {}; 
+            $modalImg.src = img.src;
 
-             function $(sel, scope=document) {
-               return scope.querySelector(sel);
+            $modalInfo.innerHTML = `
+              <p>${img.dataset.group   || ''}</p>
+              <p>${img.dataset.member  || ''}</p>
+              <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+              <p>${img.dataset.version || ''}</p>
+              <p>#${img.dataset.unique}</p>
+            `;
+
+            $modal.style.display = 'block';
+          }
+            // 모달 전체에서 우클릭 메뉴 차단
+            $('#photo-modal').addEventListener('contextmenu', e => e.preventDefault());
+
+            // 모달 안 이미지에서도 우클릭 메뉴 차단
+            $('#modal-image').addEventListener('contextmenu', e => e.preventDefault());
+
+
+
+          /* X 버튼 -or- 바깥 클릭 → 모달 닫기 */
+          $('#modal-close').addEventListener('click', () => $('#photo-modal').style.display = 'none');
+          $('#photo-modal').addEventListener('click', e => {
+            if (e.target === $('#photo-modal')) $('#photo-modal').style.display = 'none';
+          });
+
+
+          
+          /* ───────────────────────────────────────────────
+             1. DOMContentLoaded 이후 초기화
+             ─────────────────────────────────────────────── */
+           document.addEventListener('DOMContentLoaded', () => {
+            const LONG_PRESS     = 500;
+            const TAP_THRESHOLD  = 200;
+            const MOVE_THRESHOLD = 10;
+
+             function toggleCheck(img) {
+               img.classList.toggle('checked');
+               const data = JSON.parse(localStorage.getItem('userData') || '{}');
+               data[img.dataset.unique] = img.classList.contains('checked');
+               localStorage.setItem('userData', JSON.stringify(data));
+               syncLocalDataToServer();
+               updateCount();
              }
+            // ── ❶ toggleCheck 함수 정의 ...
+             const $grid          = $('#photo-grid');
+             const $viewToggleBtn = $('#view-toggle');
+             const $catToggleBtn  = $('#categoryToggleBtn');
+             const $searchInput   = $('#search-input');
+
+             // 0. 렌더링 후에 값을 채울 변수들은 let 으로
+             let originalCards = [];
+             let photoCards    = [];
+          
+             
             
-            // ── UUID & Firebase 동기화 함수 ─────────────────────
-              function ensureMyUUID() {
-                let uid = localStorage.getItem('myUUID');
-                if (!uid) {
-                  uid = crypto.randomUUID();
-                  localStorage.setItem('myUUID', uid);
-                  syncLocalDataToServer();
-                }
-                return uid;
+        async function fetchAndRenderImages() {
+           const images = await (await fetch('https://pocali-backend.onrender.com/api/images')).json();
+           // 로컬 grid 변수 선언
+           const grid = document.getElementById('photo-grid');
+           $grid.innerHTML = '';
+
+            images.forEach(image => {
+              const container = document.createElement('div');
+              container.className = 'photo-card-container';
+
+              const img = document.createElement('img');
+              img.className = 'photo-card';
+              img.src         = image.url.startsWith('http')
+                                  ? image.url
+                                  : `https://pocali-backend.onrender.com${image.url}`;
+              img.loading     = 'lazy';
+              img.alt         = `${image.group} ${image.member} ${image.category} ${image.title} ${image.version} #${image.unique_id}`;
+              img.dataset.group   = image.group;
+              img.dataset.member  = image.member;
+              img.dataset.category= image.category;
+              img.dataset.title   = image.title;
+              img.dataset.version = image.version;
+              img.dataset.unique  = image.unique_id;
+
+              container.appendChild(img);
+              if (image.type) {
+                const overlay = document.createElement('div');
+                overlay.className = 'image-overlay';
+                overlay.textContent = image.type;
+                container.appendChild(overlay);
               }
-              async function syncLocalDataToServer() {
-                const uid  = ensureMyUUID();
-                const data = JSON.parse(localStorage.getItem('userData')||'{}');
-                await set(ref(db, `users/${uid}/cards`), data);
-              }
-              async function loadFriendDeck(uuid) {
-                const snap    = await get(ref(db, `users/${uuid}/cards`));
-                const friendData = snap.exists() ? snap.val() : {};
-                applyFriendData(friendData);
-                viewOwner         = 'friend';
-                currentFriendUUID = uuid;
-                localStorage.setItem('lastFriendUUID', uuid);
-                $('#view-toggle').textContent = '👤 내 카드보기';
-              }
-              function subscribeFriendData(uuid) {
-                return onValue(ref(db, `users/${uuid}/cards`), snap => {
-                  applyFriendData(snap.val()||{});
+              $grid.appendChild(container);
+
+                    // ── 이미지별 이벤트 바인딩 (PC+모바일 모두)
+                let startTime, pressTimer;
+                img.addEventListener('pointerdown', e => {
+                  if (viewOwner !== 'self') return;
+                  startTime = performance.now();
+                  // 500ms 후에만 모달 띄우기
+                  pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
                 });
-              }
-
-
-              // ── applyFriendData (친구 보유 체크만 렌더) ───────────
-              function applyFriendData(data) {
-                photoCards.forEach(img => {
-                  img.classList.toggle('checked', !!data[img.dataset.unique]);
-                  img.style.pointerEvents = 'none';
-                });
-              }
-
-              // ── DOMContentLoaded 이후 초기화 ─────────────────────
-              document.addEventListener('DOMContentLoaded', async () => {
-                const LONG_PRESS    = 500;
-                const TAP_THRESHOLD = 200;
-
-                 // ── ➊ 상세정보 모달 열기 함수 (여기로 이동!)
-                 function showModal(img) {
-                   const modal     = $('#photo-modal');
-                   const modalImg  = $('#modal-image');
-                   const modalInfo = $('#modal-info');
-               
-                   modalImg.src = img.src;
-                   modalInfo.innerHTML = `
-                     <p>${img.dataset.group   || ''}</p>
-                     <p>${img.dataset.member  || ''}</p>
-                     <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
-                     <p>${img.dataset.version || ''}</p>
-                     <p>#${img.dataset.unique}</p>
-                   `;
-                   modal.style.display = 'block';
-                 }
-
-
-                const $grid          = $('#photo-grid');
-                const $searchInput   = $('#search-input');
-                const $catToggleBtn  = $('#categoryToggleBtn');
-                const $viewToggleBtn = $('#view-toggle');
-                const $loadOtherBtn  = $('#load-other-data');
-                
-                function toggleCheck(img) {
-                  img.classList.toggle('checked');
-                  const data = JSON.parse(localStorage.getItem('userData')||'{}');
-                  data[img.dataset.unique] = img.classList.contains('checked');
-                  localStorage.setItem('userData', JSON.stringify(data));
-                  syncLocalDataToServer();
-                  updateCount();
-                }
-
-                  const $myUuidInput = document.getElementById('my-uuid');
-                  $myUuidInput.value = ensureMyUUID();
-
-
-                // ── 메인 렌더링/페이징 함수 정의 ─────────────────────
-                async function fetchAndRenderImages() {
-                  // (1) 전체 메타데이터 → allImages
-                  const resp      = await fetch('https://pocali-backend.onrender.com/api/images');
-                  allImages       = await resp.json();
-                  totalCount      = allImages.length;
-                  currentBatch    = 0;
-                  $grid.innerHTML = '';
-                  renderNextBatch();
-                }
-                
-                
-                function renderNextBatch() {
-                  if (isRendering) return;
-                  isRendering = true;
-                  const start = currentBatch * BATCH_SIZE;
-                  const slice = allImages.slice(start, start + BATCH_SIZE);
-                  if (!slice.length) { isRendering=false; return; }
-                  slice.forEach(image => {
-                    const container = document.createElement('div');
-                    container.className = 'photo-card-container';
-                    const img = document.createElement('img');
-                    img.className       = 'photo-card';
-                    img.src             = image.url;
-                    img.dataset.unique  = image.unique_id;
-                    // 로컬 체크 복원
-                    if (JSON.parse(localStorage.getItem('userData')||'{}')[image.unique_id]) {
-                      img.classList.add('checked');
-                    }
-                    // 오버레이
-                    const ov = document.createElement('div');
-                    ov.className   = 'image-overlay';
-                    ov.textContent = image.type||image.file_type||'';
-                    container.append(ov, img);
-                    // 이벤트 바인딩
-                    img.addEventListener('dblclick', ()=> viewOwner==='self' && toggleCheck(img));
-                    let startT, timer;
-                    img.addEventListener('pointerdown', () => {
-                      startT = performance.now();
-                      timer  = setTimeout(()=>showModal(img), LONG_PRESS);
-                    });
-                    img.addEventListener('pointerup', e=>{
-                      clearTimeout(timer);
-                      if (performance.now()-startT < TAP_THRESHOLD) toggleCheck(img);
-                    });
-                    img.addEventListener('pointerleave', ()=>clearTimeout(timer));
-                    container.appendChild(img);
-                    $grid.appendChild(container);
-                  });
-                  originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
-                  photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
-                  currentBatch++;
-                  updateCount();
-                  applyFilters();
-                  isRendering = false;
-                }
-
-
-
-                window.addEventListener('scroll', ()=>{
-                  if (window.scrollY+window.innerHeight >= document.documentElement.scrollHeight-50) {
-                    renderNextBatch();
+                img.addEventListener('pointerup', e => {
+                  clearTimeout(pressTimer);
+                  const delta = performance.now() - startTime;
+                  // 터치로 짧게 누르면 보유체크
+                  if (e.pointerType === 'touch' && delta < TAP_THRESHOLD) {
+                    toggleCheck(img);
                   }
                 });
+                img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+                // PC에서 더블클릭으로 보유체크
+                img.addEventListener('dblclick', () => {
+                  if (viewOwner !== 'self') return;
+                  toggleCheck(img);
+                });
+
+                // 우클릭(또는 모바일 롱프레스) 메뉴 차단 & 모달
+                img.addEventListener('contextmenu', e => {
+                  e.preventDefault();
+                  showModal(img);
+                });
+
+
+            });
+                  
+            // ① 렌더링된 이미지 캐시 갱신
+          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+          photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
+
+      
+          }
           
+          $searchInput.addEventListener('input', applyFilters);
+
+          $viewToggleBtn.addEventListener('click', () => {
+            if (viewOwner === 'friend') loadSelfDeck();
+            else if (currentFriendUUID) loadFriendDeck(currentFriendUUID);
+            else alert('먼저 친구를 추가하세요!');
+          });
+
+          // 이제야 한 번만 이미지를 불러옵니다.
+          fetchAndRenderImages()
+            .then(() => {
+              showById();
+              loadSelfDeck();
+              updateCount();
+            })
+            .catch(console.error);
+   
+
+                    
             /* ─────────────────────────────────────────────
                2. 공통 유틸
                ───────────────────────────────────────────── */
             /** 현재 화면의 총 카드수 / 보유카드수 표시 */
             function updateCount () {
-              // “보유됨”은 로컬 userData 에 true인 것의 개수
-              const data = JSON.parse(localStorage.getItem('userData') || '{}');
-              const have = Object.values(data).filter(v => v).length;
-              // “전체”는 헤더에서 읽은 totalCount
-              document.getElementById('count-display').textContent = `${have} / ${totalCount}`;
+              const visible = originalCards.filter(card => card.offsetParent !== null);
+              const have    = visible.filter(card =>
+                               $('.photo-card', card).classList.contains('checked'));
+              $('#count-display').textContent = `${have.length} / ${visible.length}`;
             }
-
-               // ── (추가) 내 체크 데이터 Firebase에서 복원 ─────────────────
-                async function loadUserData() {
-                const uid = ensureMyUUID();                        // 기존 함수
-                const snap = await get(ref(db, `users/${uid}/cards`));
-                if (snap.exists()) {
-                  const data = snap.val();
-                  localStorage.setItem('userData', JSON.stringify(data));
-                  // 화면 갱신
-                  updateCount();
-                  if (currentView === 'category') showByCategory();
-                  else showById();
-                  loadSelfDeck();
-                }
-              }
-
           
             /** 카드 리스트를 그리드에 그대로 렌더링 */
             function render(cards) {
@@ -378,77 +352,75 @@
                ───────────────────────────────────────────── */
             /** 고유번호(ID) 내림차순 정렬 뷰 */
             function showById(list = null) {
-              const cards = (list ?? originalCards).slice();
-              cards.sort((a, b) => {
-                const imgA = a.querySelector('.photo-card');
-                const imgB = b.querySelector('.photo-card');
-                return Number(imgB.dataset.unique) - Number(imgA.dataset.unique);
-              });
+              const cards = (list ?? originalCards).slice();   // 복사본
+              cards.sort((a, b) =>
+                $('.photo-card', b).dataset.unique -
+                $('.photo-card', a).dataset.unique
+              );
               render(cards);
             }
-
-
+          
             /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
-            function showByCategory() {
-              const q = $('#search-input').value.toLowerCase();
-
-              // 1) 필터링
+            function showByCategory () {
+              const query = ($searchInput.value || '').toLowerCase();
+          
+              /* (1) 필터링 */
               const filtered = originalCards.filter(div => {
-                const img = div.querySelector('.photo-card');
-                if (!img) return false;
-                const alt = img.alt.toLowerCase();
-                const g   = img.dataset.group.toLowerCase();
-                const m   = img.dataset.member.toLowerCase();
-                const ok1 = !q || alt.includes(q);
-                const ok2 = !advancedFilters.groups.length ||
-                            advancedFilters.groups.includes(g.toUpperCase());
-                const ok3 = !advancedFilters.members.length ||
-                            advancedFilters.members.some(v => m.includes(v.toLowerCase()));
-                return ok1 && ok2 && ok3;
+                const img    = $('.photo-card', div);
+                const alt    = img.alt.toLowerCase();
+                const group  = img.dataset.group.toLowerCase();
+                const member = img.dataset.member.toLowerCase();
+          
+                const textOK   = !query || alt.includes(query);
+                const groupOK  = !advancedFilters.groups.length ||
+                                 advancedFilters.groups.includes(group.toUpperCase());
+                const memberOK = !advancedFilters.members.length ||
+                                 advancedFilters.members.some(v => member.includes(v.toLowerCase()));
+          
+                return textOK && groupOK && memberOK;
               });
-
-              // 2) 그룹핑
+          
+              /* (2) 그룹핑 ( category | title | version )*/
               const buckets = {};
               filtered.forEach(div => {
-                const img = div.querySelector('.photo-card');
-                const key = [img.dataset.category, img.dataset.title, img.dataset.version]
-                            .filter(Boolean).join(' | ');
+                const img  = $('.photo-card', div);
+                const key  = [
+                  img.dataset.category || '미분류',
+                  img.dataset.title    || '',
+                  img.dataset.version  || ''
+                ].filter(Boolean).join(' | ');
                 (buckets[key] = buckets[key] || []).push(div);
               });
-
-              // 3) 렌더링
-              $('#photo-grid').innerHTML = '';
+          
+              /* (3) 헤더 + 카드 렌더링 */
+              $grid.innerHTML = '';
               Object.entries(buckets)
-                .sort(([,a],[,b]) => {
-                  const ia = a[0].querySelector('.photo-card');
-                  const ib = b[0].querySelector('.photo-card');
-                  return Number(ib.dataset.unique) - Number(ia.dataset.unique);
-                })
-                .forEach(([hdr,cards]) => {
+                .sort(([,a],[,b]) =>
+                  +$('.photo-card', b[0]).dataset.unique -
+                  +$('.photo-card', a[0]).dataset.unique
+                )
+                .forEach(([header, cards]) => {
                   const h2 = document.createElement('h2');
-                  h2.textContent = hdr;
-                  h2.style.margin = '16px 0 8px';
-                  $('#photo-grid').appendChild(h2);
-                  cards.sort((x,y) => {
-                    const ix = x.querySelector('.photo-card');
-                    const iy = y.querySelector('.photo-card');
-                    return Number(iy.dataset.unique) - Number(ix.dataset.unique);
-                  }).forEach(d => $('#photo-grid').appendChild(d));
+                  h2.textContent   = header;
+                  h2.style.margin  = '16px 0 8px';
+                  $grid.appendChild(h2);
+          
+                  cards.sort((a, b) =>
+                    +$('.photo-card', b).dataset.unique -
+                    +$('.photo-card', a).dataset.unique
+                  ).forEach(div => $grid.appendChild(div));
                 });
-
+          
               updateCount();
             }
-
-
           
             /** 현재 필터/뷰 상태로 다시 그리기 */
             function applyFilters () {
                 /* ② 공통 필터(검색어 + 상세조건) 한 번만 계산 */
               const query = ($searchInput.value || '').toLowerCase();
 
-               const filtered = originalCards.filter(div => {
-                // div 내부에서 .photo-card 찾기
-                const img    = div.querySelector('.photo-card');
+              const filtered = originalCards.filter(div => {
+                const img    = $('.photo-card', div);
                 const alt    = img.alt.toLowerCase();
                 const group  = img.dataset.group.toLowerCase();
                 const member = img.dataset.member.toLowerCase();
@@ -461,13 +433,8 @@
 
                 return textOK && groupOK && memberOK;
               });
-              function applyFilters() {
-              // …필터 배열 계산…
-              if (currentView === 'category') {
-                showByCategory();
-              } else {
-                showById(filtered);
-              }
+              if (currentView === 'category') showByCategory(filtered);
+              else                            showById(filtered);
             }
 
             
@@ -490,7 +457,26 @@
             }
           
             /** 친구 보유 카드 표시 */
-            
+            async function loadFriendDeck (uuid) {
+              const res = await fetch(`/api/friend/${uuid}/collection`);
+              if (!res.ok) {
+                alert('친구 데이터를 불러올 수 없습니다.');
+                return;
+              }
+          
+              const friendData = (await res.json()).data || {};
+              photoCards.forEach(img => {
+                img.classList.toggle('checked', !!friendData[img.dataset.unique]);
+                img.style.pointerEvents = 'none';   // 수정 금지
+              });
+          
+              viewOwner         = 'friend';
+              currentFriendUUID = uuid;
+              localStorage.setItem('lastFriendUUID', uuid);
+          
+              $viewToggleBtn.textContent = '👤 내 카드보기';
+              updateCount();
+            }
           
             /* 전역(콘솔)에서도 호출할 수 있도록 */
             window.loadSelfDeck   = loadSelfDeck;
@@ -524,7 +510,24 @@
             showById();          // 기본 정렬
             loadSelfDeck();       // ✅ 보유표시도 함께!
             updateCount();       // 카운터 초기화
-          
+            /* 🔻 ❹ 서버→클라이언트 10초 폴링 ------------------------*/
+            async function pollServerData () {
+              if (viewOwner !== 'self') return;           // 친구 보기 땐 건너뜀
+            
+              const me = localStorage.getItem('myUUID');
+              if (!me) return;
+            
+              const r = await fetch(`/api/user/${me}`);
+              if (!r.ok) return;
+              userData = JSON.parse((await r.json()).data || '{}');
+              localStorage.setItem('userData', JSON.stringify(userData));
+            
+              photoCards.forEach(img =>
+                img.classList.toggle('checked', !!userData[img.dataset.unique]));
+              updateCount();
+            }
+            setInterval(pollServerData, 10_000);
+            /* ------------------------------------------------------*/
             /* ── 5-A. 우측 FAB & 모달 보조 기능 ─────────────────────────── */
             const $fab           = $('#fab');
             const $userModal     = $('#user-modal');
@@ -535,7 +538,7 @@
             const $friendClose   = $('#friend-modal-close');
             const $friendConfirm = $('#friend-add-confirm');
 
-            const resetBtn      = $('#reset-checks');
+            const $resetBtn      = $('#reset-checks');
             const $exportBtn     = $('#export-sheet');     // (시트 모달 열기만)
 
             const $userDataModal      = $('#user-data-modal');
@@ -547,34 +550,59 @@
             });
 
 
-            
-            // ── “다른 UUID 불러오기” 교체 핸들러 ─────────────────
-            $loadOtherBtn.addEventListener('click', ()=> {
+
+
+
+            /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
+            $('#load-other-data')?.addEventListener('click', async () => {
               const other = $('#other-uuid').value.trim();
               if (!other) return alert('UUID를 입력하세요!');
-              // 친구 실시간 구독 + 그리기
-              subscribeFriendData(other);
-              loadFriendDeck(other);
+              const r = await fetch(`/api/user/${other}`);
+              if (!r.ok) return alert('해당 UUID를 찾을 수 없습니다.');
+              const json = await r.json();
+              localStorage.setItem('userData', json.data);
+              localStorage.setItem('myUUID',   other);
+              location.reload();                 // ← 바로 적용
             });
+            /* -------------------------------------------------------*/
+            /* 🔻 ❺-B : 유저 데이터 모달 & 서버 동기화 ----------------------- */
+            const $loadUserBtn  = $('#load-user-data');      // ① “유저 데이터 불러오기”
 
-              /* ── 체크 상태 초기화 (Reset) ───────────────── */
-                // 이미 선언된 resetBtn 변수를 그대로 씁니다
-                resetBtn.addEventListener('click', async () => {
-                if (!confirm('모든 체크를 해제할까요?')) return;
-                photoCards.forEach(img => img.classList.remove('checked'));
-                localStorage.removeItem('userData');
-                await set(ref(db, `users/${ensureMyUUID()}/cards`), {});
-                updateCount();
+            // 1) UUID 가 없으면 서버에서 새로 발급받기
+            async function ensureMyUUID () {
+              let me = localStorage.getItem('myUUID');
+              if (me) return me;
+              const r = await fetch('/api/register', { method:'POST' });
+              me = (await r.json()).user_id;
+              localStorage.setItem('myUUID', me);
+              return me;
+            }
+
+            // 2) 로컬 userData → 서버 DB 업로드
+            async function syncLocalDataToServer () {
+              const me = localStorage.getItem('myUUID');
+              if (!me) return;
+              const data = JSON.parse(localStorage.getItem('userData') || '{}');
+              await fetch(`/api/user/${me}`, {
+                method : 'POST',
+                headers: { 'Content-Type':'application/json' },
+                body   : JSON.stringify({ data })
               });
-            
-              /* ── “내 UUID 불러오기” 버튼 핸들러 복원 ───────────────── */
-              document.getElementById('load-user-data')
-                .addEventListener('click', () => {
-                  const uid = ensureMyUUID();
-                  document.getElementById('my-uuid').value = uid;
-                  document.getElementById('user-data-modal').style.display = 'block';
-                  document.getElementById('uuid-msg').textContent = '';
-                });
+            }
+
+            // 3) “유저 데이터 불러오기” 버튼 클릭 시 모달 열기
+            $loadUserBtn?.addEventListener('click', async () => {
+              $userModal.style.display = 'none';          // 기존 모달 닫기
+              const me = await ensureMyUUID();            // UUID 확보/표시
+              $('#my-uuid').value    = me;
+              $('#other-uuid').value = '';
+              $('#uuid-msg').textContent = '';
+              $('#user-data-modal').style.display = 'block';
+            });
+            /* ------------------------------------------------------------- */
+
+
+
 
             /* ① FAB 눌러 → ‘유저 설정’ 모달 */
             $fab.addEventListener('click', () => $userModal.style.display = 'block');
@@ -591,6 +619,44 @@
             $friendClose.addEventListener('click', () => $friendModal.style.display = 'none');
             $friendModal.addEventListener('click', e => { if (e.target === $friendModal) $friendModal.style.display = 'none'; });
 
+            $friendConfirm.addEventListener('click', async () => {
+              const me     = localStorage.getItem('myUUID');
+              const friend = $('#friend-uuid').value.trim();
+              if (!me || !friend) { alert('UUID를 입력하세요!'); return; }
+
+              const ok = await fetch('/api/friends', {
+                method : 'POST',
+                headers: { 'Content-Type':'application/json' },
+                body   : JSON.stringify({ me, friend })
+              }).then(r => r.ok);
+
+              if (!ok) return alert('등록 실패');
+
+              localStorage.setItem('lastFriendUUID', friend);
+              $friendModal.style.display = 'none';
+              loadFriendDeck(friend);
+              alert('친구 등록 완료!');
+            });
+
+            /* ③ 체크 상태 초기화 */
+            $resetBtn.addEventListener('click', async () => {      // ← async 로 변경
+              if (!confirm('모든 체크를 해제할까요?')) return;
+
+              // 1) 화면-로컬 초기화
+              $$('.photo-card').forEach(img => img.classList.remove('checked'));
+              localStorage.removeItem('userData');
+              updateCount();
+
+              // 2) 서버에도 빈 데이터 업로드  ← ★ 이 두 줄 추가
+              const me = localStorage.getItem('myUUID');
+              if (me) {
+                await fetch(`/api/user/${me}`, {
+                  method : 'POST',
+                  headers: { 'Content-Type':'application/json' },
+                  body   : JSON.stringify({ data: {} })
+                });
+              }
+            });
 
             /* ④ 시트(프린트) 모달 열기 */
             $exportBtn.addEventListener('click', () => {
@@ -711,138 +777,10 @@
                 document.body.removeChild(loader);
               });
             }
-            // ── ➊ 상세정보 모달 열기 함수 ─────────────────────────
-            function showModal(img) {
-              const modal     = document.getElementById('photo-modal');
-              const modalImg  = document.getElementById('modal-image');
-              const modalInfo = document.getElementById('modal-info');
 
-              modalImg.src = img.src;
-              modalInfo.innerHTML = `
-                <p>${img.dataset.group   || ''}</p>
-                <p>${img.dataset.member  || ''}</p>
-                <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
-                <p>${img.dataset.version || ''}</p>
-                <p>#${img.dataset.unique}</p>
-              `;
-              modal.style.display = 'block';
-            }
-            // 모달 닫기 핸들러(기존 X 버튼 / 바깥 클릭)
-            document.getElementById('modal-close').addEventListener('click', () => {
-              document.getElementById('photo-modal').style.display = 'none';
-            });
-            document.getElementById('photo-modal').addEventListener('click', e => {
-              if (e.target === document.getElementById('photo-modal')) {
-                document.getElementById('photo-modal').style.display = 'none';
-              }
-            });
-
-
-            // ─── 페이징별 렌더링 함수 ─────────────────────────
-             function renderNextBatch() {
-            if (isRendering) return;
-            isRendering = true;
-
-            const start = currentBatch * BATCH_SIZE;
-            const end   = start + BATCH_SIZE;
-            const slice = allImages.slice(start, end);
-
-            slice.forEach(image => {
-              // 1) 카드 컨테이너 생성
-              const container = document.createElement('div');
-              container.className = 'photo-card-container';
-
-              // 2) <img> 요소 생성
-              const img = document.createElement('img');
-              img.className       = 'photo-card';
-              img.src             = image.url.startsWith('http')
-                                    ? image.url
-                                    : `https://pocali-backend.onrender.com${image.url}`;
-              img.loading         = 'lazy';
-              img.alt             = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
-              img.dataset.group   = image.group;
-              img.dataset.member  = image.member;
-              img.dataset.category= image.category;
-              img.dataset.title   = image.title;
-              img.dataset.version = image.version;
-              img.dataset.unique  = image.unique_id;
-
-              // ── 로컬 저장소(userData)에 있던 체크 정보 재적용
-              const saved = JSON.parse(localStorage.getItem('userData') || '{}');
-              if (saved[image.unique_id]) {
-                img.classList.add('checked');
-              }
-
-
-              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
-              const overlay = document.createElement('div');
-              overlay.className   = 'image-overlay';
-              overlay.textContent = image.type || image.file_type || '';
-              container.appendChild(overlay);
-
-              // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
-              let startTime, pressTimer;
-              img.addEventListener('pointerdown', e => {
-                if (viewOwner !== 'self') return;
-                startTime = performance.now();
-                pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-              });
-              img.addEventListener('pointerup', e => {
-                clearTimeout(pressTimer);
-                if (performance.now() - startTime < TAP_THRESHOLD) {
-                  toggleCheck(img);
-                }
-              });
-              img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
-              img.addEventListener('dblclick', () => {
-                if (viewOwner !== 'self') return;
-                toggleCheck(img);
-              });
-              img.addEventListener('contextmenu', e => {
-                e.preventDefault();
-                showModal(img);
-              });
-
-              // 5) 그리드에 추가
-              container.appendChild(img);
-              $grid.appendChild(container);
-            });
-              // — 캐시 갱신
-            originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
-            photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
-
-            // — 상태 갱신
-            if (currentBatch === 0) {
-              totalCount = allImages.length;
-            }
-            currentBatch++;
-            updateCount();
-
-            // — 현재 뷰(ID/카테고리)에 맞춰 재렌더
-            applyFilters();
-
-            isRendering = false; 
-          }
           
-            // ─── 무한 스크롤 트리거 ─────────────────────────
-            window.addEventListener('scroll', () => {
-              const nearBottom = window.innerHeight + window.scrollY
-                               >= document.body.offsetHeight - 200;
-              if (nearBottom && currentBatch * BATCH_SIZE < allImages.length) {
-                renderNextBatch();
-              }
-            });
-          // ── 초기화 흐름 (여기로 옮겼습니다)
-           ensureMyUUID();
-           await loadUserData();
-           fetchAndRenderImages();
-       
-          
-         
-          });
-                
-        
-      </script>
+          }); // DOMContentLoaded
+          </script>
                
       </body>
       </html>
