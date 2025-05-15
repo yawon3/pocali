@@ -525,48 +525,43 @@
               detailModal.style.display = 'none';
             });
 
-            document.getElementById('export-sheet').addEventListener('click', () => {
-                // 1) 검색어 & 상세필터 값 가져오기
-                const q      = document.getElementById('search-input').value.trim().toLowerCase();
-                const groups = advancedFilters.groups;
-                const mems   = advancedFilters.members;
-            
-                // 2) allImages 배열 전체에서 조건에 맞는 메타데이터만 필터링
-                const sel = allImages.filter(meta => {
-                  const textOK  = !q || 
-                    (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
-                    .toLowerCase().includes(q);
-                  const groupOK = !groups.length || groups.includes(meta.group);
-                  const memOK   = !mems.length   || mems.includes(meta.member);
-                  return textOK && groupOK && memOK;
-                });
-                if (!sel.length) {
-                  return alert('조건에 맞는 카드가 없습니다.');
-                }
-            
-                // 3) 필터된 메타 → img 요소로 변환
-                const nodes = sel.map(meta => {
-                  const img = document.createElement('img');
-                  img.className       = 'photo-card';
-                  img.src             = meta.url;
-                  // 보유 여부 반영
-                  const ud = JSON.parse(localStorage.getItem('userData')||'{}');
-                  if (ud[meta.unique_id]) img.classList.add('checked');
-                  img.alt             = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
-                  img.dataset.unique  = meta.unique_id;
-                  img.dataset.group   = meta.group;
-                  img.dataset.member  = meta.member;
-                  img.dataset.category= meta.category;
-                  img.dataset.title   = meta.title;
-                  img.dataset.version = meta.version;
-                  return img;
-                });
-            
-                // 4) 시트 생성 함수 호출
-                document.getElementById('export-modal').style.display = 'none';
-                generateImageSheet(nodes);
-              });
+             // ✅ 올바른 코드: export-form 값을 기준으로 allImages에서 필터
+             const $exportForm  = document.getElementById('export-form');
+             const $exportModal = document.getElementById('export-modal'); 
+             $exportForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const fd      = new FormData($exportForm);
+                const group   = fd.get('group');
+                const members = fd.getAll('member');
 
+                const sel = allImages.filter(meta =>
+                  meta.group === group &&
+                  (members.length === 0 || members.includes(meta.member))
+                );
+                if (!sel.length) {
+                  return alert('선택하신 조건에 맞는 카드가 없습니다.');
+                }
+                  // 3) 메타→<img> 요소로 변환 (보유여부 반영)
+               const nodes = sel.map(meta => {
+                const img = document.createElement('img');
+                img.className       = 'photo-card';
+                img.src             = meta.url;
+                img.alt             = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
+                img.dataset.unique  = meta.unique_id;
+                img.dataset.group   = meta.group;
+                img.dataset.member  = meta.member;
+                img.dataset.category= meta.category;
+                img.dataset.title   = meta.title;
+                img.dataset.version = meta.version;
+                const ud = JSON.parse(localStorage.getItem('userData')||'{}');
+                if (ud[meta.unique_id]) img.classList.add('checked');
+                return img;
+              });
+            
+                 $exportModal.style.display = 'none';
+                  generateImageSheet(nodes);
+                });
+            
 
             /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
             $('#load-other-data')?.addEventListener('click', async () => {
@@ -680,36 +675,7 @@
               $('#user-modal').style.display = 'none';
               $('#export-modal').style.display = 'block';
             });
-            /* ── 5-B. “시트 생성” (export-modal) 기능 복구 ────────────────── */
-            const $exportModal = $('#export-modal');
-            const $exportClose = $('#export-modal-close');
-            const $exportForm  = $('#export-form');
-
-            /* ① ‘+’(폴더) 메뉴에서 “포토카드 시트 출력” 눌렀을 때 이미 열리도록
-                → 이 부분은 5-A 스니펫에 넣은 $exportBtn 클릭에서 처리됨           */
-
-            /* ② 모달 X 버튼 */
-            $exportClose.addEventListener('click', () => $exportModal.style.display = 'none');
-
-            /* ③ 라디오/체크박스 선택 후  “시트 생성” 제출 */
-            $exportForm.addEventListener('submit', e => {
-              e.preventDefault();
-              const fd      = new FormData($exportForm);
-              const group   = fd.get('group');           // 라디오 (반드시 1개)
-              const members = fd.getAll('member');       // 체크박스 (0~여러 개)
-
-              if (!members.length) { alert('멤버를 하나 이상 선택하세요!'); return; }
-
-              const selCards = $$('.photo-card').filter(img =>
-                  img.dataset.group === group &&
-                  members.includes(img.dataset.member)
-              );
-
-              if (!selCards.length) { alert('해당 조건의 카드가 없습니다.'); return; }
-
-              $exportModal.style.display = 'none';
-              generateImageSheet(selCards);
-            });
+            
 
             // ➊ 상세 검색 모달 열기/닫기
               const searchDetailBtn         = document.getElementById('search-detail-btn');
@@ -783,7 +749,7 @@
               `;
               document.body.appendChild(loader);
 
-              html2canvas(target, {scale:2}).then(canvas => {
+              html2canvas(target, { scale:2, useCORS: true }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `pocalist_sheet_${Date.now()}.png`;
                 link.href = canvas.toDataURL('image/png');
