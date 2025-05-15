@@ -756,12 +756,14 @@
               `;
               overlay.appendChild(grid);
 
-              /* 4-3. 카드 삽입 (불투명도 = 보유 여부) */
-              cards.forEach(img => {
-                const clone = img.cloneNode();
+              /* 4-3. 카드 삽입 (새 Image로 CORS 허용) */
+              cards.forEach(orig => {
+                const clone = new Image();
+                clone.crossOrigin = 'anonymous';
+                clone.src         = orig.src;
                 clone.style.width       = '100%';
-                clone.style.opacity     = img.classList.contains('checked') ? '1' : '0.4';
-                clone.style.borderRadius= '0';  // 둥근 모서리 제거
+                clone.style.opacity     = orig.classList.contains('checked') ? '1' : '0.4';
+                clone.style.borderRadius= '0';  
                 grid.appendChild(clone);
               });
 
@@ -795,7 +797,11 @@
               `;
               document.body.appendChild(loader);
 
-              html2canvas(target, { scale:3, useCORS: true }).then(canvas => {
+              html2canvas(target, {
+                scale: 2,               // 너무 크면 브라우저 메모리 이슈가 생길 수 있으니 적당히
+                useCORS: true,          // 위 crossOrigin 허용
+                backgroundColor: '#fff' // 투명 배경 대신 흰색
+              }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `pocalist_sheet_${Date.now()}.png`;
                 link.href = canvas.toDataURL('image/png');
