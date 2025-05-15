@@ -516,14 +516,30 @@
             detailModal.addEventListener('click', e => { if (e.target === detailModal) detailModal.style.display = 'none'; });
 
             // 폼 제출 시 필터 적용
-            detailForm.addEventListener('submit', e => {
-              e.preventDefault();
-              const fd = new FormData(detailForm);
-              advancedFilters.groups  = fd.getAll('group');   // 체크된 그룹 배열
-              advancedFilters.members = fd.getAll('member');  // 체크된 멤버 배열
-              applyFilters();
-              detailModal.style.display = 'none';
-            });
+             detailForm.addEventListener('submit', e => {
+               e.preventDefault();
+              const fd      = new FormData(detailForm);
+               const groups  = fd.getAll('group');
+               const members = fd.getAll('member');
+            
+               // ① allImages 전체에서 필터 적용
+               if (!groups.length && !members.length) {
+                 allImages = backupAllImages.slice();
+               } else {
+                 allImages = backupAllImages.filter(meta =>
+                   (groups.length === 0 || groups.includes(meta.group)) &&
+                   (members.length === 0 || members.includes(meta.member))
+                 );
+               }
+            
+               // ② 페이지네이션 초기화 + 첫 배치 렌더
+               currentBatch = 0;
+               $grid.innerHTML = '';
+               renderNextBatch();
+            
+               // ③ 모달 닫기
+               detailModal.style.display = 'none';
+             });
 
              // ✅ 올바른 코드: export-form 값을 기준으로 allImages에서 필터
              const $exportForm  = document.getElementById('export-form');
@@ -545,6 +561,7 @@
                const nodes = sel.map(meta => {
                 const img = document.createElement('img');
                 img.className       = 'photo-card';
+                img.crossOrigin     = 'anonymous';
                 img.src             = meta.url;
                 img.alt             = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
                 img.dataset.unique  = meta.unique_id;
