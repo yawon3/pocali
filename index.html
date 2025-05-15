@@ -836,11 +836,11 @@
               
           
          // ── 초기화 흐름 ──────────────────────────────────────
-            ensureMyUUID();
-            await loadUserData();           // ← 콜백 내부에서만 호출
+          ensureMyUUID();
+            await loadUserData();       // 이제 async 콜백 안이므로 정상 동작
             fetchAndRenderImages();
-
-       
+          });
+                
         
       </script>
                
