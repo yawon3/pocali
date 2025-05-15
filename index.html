@@ -728,7 +728,7 @@
               });
              
             /* ④ 시트 → 이미지 다운로드용 헬퍼  */
-            function generateImageSheet(cards) {
+            async function generateImageSheet(cards) {
               // ── ① 전체 오버레이: 흰 배경, 내부만 스크롤, 오버플로우 전파 차단
               const overlay = document.createElement('div');
               overlay.style.cssText = `
@@ -756,16 +756,26 @@
               `;
               overlay.appendChild(grid);
 
-              /* 4-3. 카드 삽입 (새 Image로 CORS 허용) */
-              cards.forEach(orig => {
-                const clone = new Image();
-                clone.crossOrigin = 'anonymous';
-                clone.src         = orig.src;
-                clone.style.width       = '100%';
-                clone.style.opacity     = orig.classList.contains('checked') ? '1' : '0.4';
-                clone.style.borderRadius= '0';  
-                grid.appendChild(clone);
-              });
+
+              /* 4-3. 카드 삽입: fetch→Blob→ObjectURL 으로 CORS 회피 */
+              const clones = await Promise.all(cards.map(async orig => {
+                // 1) 원격 이미지를 불러와 blob 으로 변환
+                const res  = await fetch(orig.src);
+                const blob = await res.blob();
+            
+                // 2) blob→ObjectURL, 이를 src 로
+                const url  = URL.createObjectURL(blob);
+                const img  = new Image();
+                img.src    = url;
+            
+                // 3) 스타일 그대로 복제 (체크 여부, border-radius 제거)
+                img.style.width        = '100%';
+                img.style.opacity      = orig.classList.contains('checked') ? '1' : '0.4';
+                img.style.borderRadius = '0';
+            
+                return img;
+              }));
+              clones.forEach(img => grid.appendChild(img));
 
               /* 4-4. 버튼들 */
               const btnBar = document.createElement('div');
@@ -835,7 +845,7 @@
               document.body.appendChild(loader);
 
               html2canvas(target, {
-                scale: 1.5,               // 너무 크면 브라우저 메모리 이슈가 생길 수 있으니 적당히
+                scale: 2,               // 너무 크면 브라우저 메모리 이슈가 생길 수 있으니 적당히
                 useCORS: true,          // 위 crossOrigin 허용
                 backgroundColor: '#fff' // 투명 배경 대신 흰색
               }).then(canvas => {
