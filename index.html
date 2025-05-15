@@ -243,7 +243,7 @@
           
            async function fetchAndRenderImages() {
                // 1) 전체 이미지 메타데이터 + 전체 개수 가져오기
-              const resp    = await fetch('https://pocali-backend.onrender.com/api/images');
+              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
               allImages     = await resp.json();
               totalCount    = allImages.length;
               // 2) 첫 배치 렌더링 전 초기화
@@ -457,7 +457,7 @@
               const me = localStorage.getItem('myUUID');
               if (!me) return;
             
-              const r = await fetch(`/api/user/${me}`);
+              const r = await fetch(`https://pocali-backend.onrender.com/api/user/${me}`);
               if (!r.ok) return;
               userData = JSON.parse((await r.json()).data || '{}');
               localStorage.setItem('userData', JSON.stringify(userData));
@@ -489,7 +489,47 @@
               if (e.target === $userDataModal) $userDataModal.style.display = 'none';
             });
 
+            // 상세 검색 열기/닫기
+            const detailBtn = document.getElementById('search-detail-btn');
+            const detailModal = document.getElementById('detail-search-modal');
+            const detailForm  = document.getElementById('detail-search-form');
 
+            detailBtn.addEventListener('click', () => detailModal.style.display = 'block');
+            detailModal.querySelector('.close').addEventListener('click', () => detailModal.style.display = 'none');
+            detailModal.addEventListener('click', e => { if (e.target === detailModal) detailModal.style.display = 'none'; });
+
+            // 폼 제출 시 필터 적용
+            detailForm.addEventListener('submit', e => {
+              e.preventDefault();
+              const fd = new FormData(detailForm);
+              advancedFilters.groups  = fd.getAll('group');   // 체크된 그룹 배열
+              advancedFilters.members = fd.getAll('member');  // 체크된 멤버 배열
+              applyFilters();
+              detailModal.style.display = 'none';
+            });
+
+            document.getElementById('export-sheet').addEventListener('click', () => {
+            const q = document.getElementById('search-input').value.trim().toLowerCase();
+            // ① allImages에서 텍스트+상세조건 필터
+            let sel = allImages.filter(img => {
+              const textOK = !q || (`${img.group} ${img.member} ${img.category} ${img.title}`)
+                                  .toLowerCase().includes(q);
+              const grpOK  = !advancedFilters.groups.length || advancedFilters.groups.includes(img.group);
+              const memOK  = !advancedFilters.members.length || advancedFilters.members.includes(img.member);
+              return textOK && grpOK && memOK;
+            });
+            if (!sel.length) return alert('조건에 맞는 카드가 없습니다.');
+            // ② 메타 → DOM노드로 변환
+            const nodes = sel.map(meta => {
+              const img = document.createElement('img');
+              img.src = meta.url; img.dataset.unique = meta.unique_id;
+              img.dataset.group = meta.group; img.dataset.member = meta.member;
+              // …필요한 데이터 속성 동일 세팅…
+              img.className = 'photo-card';
+              return img;
+            });
+            generateImageSheet(nodes);
+          });
 
 
 
@@ -497,7 +537,7 @@
             $('#load-other-data')?.addEventListener('click', async () => {
               const other = $('#other-uuid').value.trim();
               if (!other) return alert('UUID를 입력하세요!');
-              const r = await fetch(`/api/user/${other}`);
+              const r = await fetch(`https://pocali-backend.onrender.com/api/user/${other}`);
               if (!r.ok) return alert('해당 UUID를 찾을 수 없습니다.');
               const json = await r.json();
               localStorage.setItem('userData', json.data);
@@ -523,7 +563,7 @@
               const me = localStorage.getItem('myUUID');
               if (!me) return;
               const data = JSON.parse(localStorage.getItem('userData') || '{}');
-              await fetch(`/api/user/${me}`, {
+              await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
                 method : 'POST',
                 headers: { 'Content-Type':'application/json' },
                 body   : JSON.stringify({ data })
@@ -590,7 +630,7 @@
               // 2) 서버에도 빈 데이터 업로드  ← ★ 이 두 줄 추가
               const me = localStorage.getItem('myUUID');
               if (me) {
-                await fetch(`/api/user/${me}`, {
+                await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
                   method : 'POST',
                   headers: { 'Content-Type':'application/json' },
                   body   : JSON.stringify({ data: {} })
