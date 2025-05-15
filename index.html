@@ -589,6 +589,7 @@
                  $exportModal.style.display = 'none';
                   generateImageSheet(nodes);
                 });
+                overlay.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
 
 
             /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
@@ -723,20 +724,19 @@
             /* ④ 시트 → 이미지 다운로드용 헬퍼  */
             function generateImageSheet(cards) {
               /* 4-1. 전체 오버레이 */
-              const overlay = document.createElement('div');
-              overlay.style.cssText = `
-                position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:9999;
-                display:flex; flex-direction:column; align-items:center;
-              `; // ← overflow:auto 제거
+               const overlay = document.createElement('div');
+               overlay.style.cssText = `
+                 position:fixed; inset:0; background:#fff; z-index:9999;
+                 overflow:auto; padding:20px;
+               `;
 
               /* 4-2. 그리드 */
               const grid = document.createElement('div');
               grid.style.cssText = `
                 display:grid;
                 grid-template-columns:repeat(16, 1fr);
-                gap:8px; padding:24px; max-width:none;
-                overflow:visible;
-              `; // ← overflow-x:auto → overflow:visible
+                gap:8px; margin-bottom:16px;
+              `;
               overlay.appendChild(grid);
 
               /* 4-3. 카드 삽입 (불투명도 = 보유 여부) */
@@ -760,7 +760,7 @@
               const save  = document.createElement('button');
               save.textContent = '이미지 저장';
               save.style.cssText = `padding:8px 14px; background:#4CAF50; color:#fff; border:none;`;
-              save.onclick  = () => downloadAsImage(overlay);
+              save.onclick  = () => downloadAsImage(grid);
 
               btnBar.append(close, save);
 
