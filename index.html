@@ -801,7 +801,7 @@
                 `;
                 document.body.appendChild(loader);
 
-                // 2) 그리드 안의 <img> 모두 로드될 때까지 대기
+                // 2) 이미지 로드 대기
                 const imgs = Array.from(grid.querySelectorAll('img'));
                 Promise.all(imgs.map(img => {
                   if (img.complete) return Promise.resolve();
@@ -809,42 +809,58 @@
                     img.addEventListener('load', res, { once: true });
                     img.addEventListener('error', res, { once: true });
                   });
-                }))
-                .then(() => {
+                })).then(() => {
+
                   // 3) 캡처
-                  html2canvas(grid, {
-                    scale: 2,
-                    useCORS: true,           // fetch→blob 방식이므로 없어도 되지만 안전하게
-                    backgroundColor: '#fff'  // 흰 배경 고정
-                  })
+                  html2canvas(grid, { scale:2, backgroundColor:'#fff' })
                   .then(canvas => {
-                    // 4) toBlob → ObjectURL → 다운로드
+                    // 4) blob 생성 시도
                     canvas.toBlob(blob => {
-                      if (!blob) {
-                        alert('이미지 생성에 실패했습니다.');
+                      // 4-a) blob 이 정상적이지 않다면 DataURL fallback
+                      if (!blob || !(blob instanceof Blob)) {
+                        console.warn('toBlob 결과가 유효하지 않습니다. DataURL 로 대체합니다.');
+                        const dataURL = canvas.toDataURL('image/png');
+                        downloadUsingDataURL(dataURL);
                         document.body.removeChild(loader);
                         return;
                       }
-                      const url  = URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href    = url;
-                      link.download= `pocalist_sheet_${Date.now()}.png`;
-                      document.body.appendChild(link);
-                      link.click();
-                      // 다운로드 후 메모리 해제
-                      setTimeout(() => {
-                        URL.revokeObjectURL(url);
-                        document.body.removeChild(link);
-                        document.body.removeChild(loader);
-                      }, 100);
+
+                      // 4-b) 정상적 Blob 이라면 ObjectURL 로 다운로드
+                      const objectURL = URL.createObjectURL(blob);
+                      downloadUsingObjectURL(objectURL);
+                      // 잠시 후 메모리 해제
+                      setTimeout(() => URL.revokeObjectURL(objectURL), 1000);
+                      document.body.removeChild(loader);
+
                     }, 'image/png');
                   })
                   .catch(err => {
                     alert('캡처 실패: ' + err.message);
                     document.body.removeChild(loader);
                   });
+
                 });
               };
+
+              // DataURL 방식 다운로드 헬퍼  
+              function downloadUsingDataURL(dataURL) {
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = `pocalist_sheet_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }
+
+              // ObjectURL 방식 다운로드 헬퍼  
+              function downloadUsingObjectURL(url) {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `pocalist_sheet_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }
 
 
               btnBar.append(close, save);
