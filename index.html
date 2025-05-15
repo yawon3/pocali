@@ -722,30 +722,39 @@
              
             /* ④ 시트 → 이미지 다운로드용 헬퍼  */
             function generateImageSheet(cards) {
-              /* 4-1. 전체 오버레이 */
-               const overlay = document.createElement('div');
-               overlay.style.cssText = `
-                 position:fixed; inset:0; background:#fff; z-index:9999;
-                 overflow:auto; padding:20px;
-               `;
+              // ── ① 전체 오버레이: 흰 배경, 내부만 스크롤, 오버플로우 전파 차단
+              const overlay = document.createElement('div');
+              overlay.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: #fff;
+                z-index: 9999;
+                overflow: auto;
+                padding: 20px;
+                overscroll-behavior: contain;
+              `;
 
              // overlay 스크롤 전파 차단 (내부만 스크롤 되게)
              overlay.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
 
               /* 4-2. 그리드 */
-              const grid = document.createElement('div');
-              grid.style.cssText = `
-                display:grid;
-                grid-template-columns:repeat(16, 1fr);
-                gap:8px; margin-bottom:16px;
+             const grid = document.createElement('div');
+             grid.style.cssText = `
+              display: grid;
+              /* 한 줄에 200px씩 최대한 배치 */
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 12px;
+              margin-bottom: 16px;
+              background: #fff;
               `;
               overlay.appendChild(grid);
 
               /* 4-3. 카드 삽입 (불투명도 = 보유 여부) */
               cards.forEach(img => {
                 const clone = img.cloneNode();
-                clone.style.width  = '100%';
-                clone.style.opacity= img.classList.contains('checked') ? '1' : '0.4';
+                clone.style.width       = '100%';
+                clone.style.opacity     = img.classList.contains('checked') ? '1' : '0.4';
+                clone.style.borderRadius= '0';  // 둥근 모서리 제거
                 grid.appendChild(clone);
               });
 
@@ -762,7 +771,7 @@
               const save  = document.createElement('button');
               save.textContent = '이미지 저장';
               save.style.cssText = `padding:8px 14px; background:#4CAF50; color:#fff; border:none;`;
-              save.onclick  = () => downloadAsImage(grid);
+              save.onclick  = () => downloadAsImage(grid);  // grid에 흰 배경을 줬으니, grid만 캡처해도 OK
 
               btnBar.append(close, save);
 
@@ -779,7 +788,7 @@
               `;
               document.body.appendChild(loader);
 
-              html2canvas(target, { scale:2, useCORS: true }).then(canvas => {
+              html2canvas(target, { scale:3, useCORS: true }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `pocalist_sheet_${Date.now()}.png`;
                 link.href = canvas.toDataURL('image/png');
