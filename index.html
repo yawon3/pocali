@@ -557,27 +557,24 @@
               loadFriendDeck(other);
             });
 
-            document.addEventListener('DOMContentLoaded', () => {
-            const resetBtn = document.getElementById('reset-checks');
-            resetBtn.addEventListener('click', async () => {
-              if (!confirm('모든 체크를 해제할까요?')) return;
-              photoCards.forEach(img => img.classList.remove('checked'));
-              localStorage.removeItem('userData');
-              await set(ref(db, `users/${ensureMyUUID()}/cards`), {});
-              updateCount();
-            });
-
-
-             // ── “내 UUID 불러오기” 버튼 핸들러 복원
-             document.getElementById('load-user-data')
-               .addEventListener('click', () => {
-                 const uid = ensureMyUUID();
-                 document.getElementById('my-uuid').value = uid;
-                 document.getElementById('user-data-modal').style.display = 'block';
-                 document.getElementById('uuid-msg').textContent = '';
-               });
-
-
+              /* ── 체크 상태 초기화 (Reset) ───────────────── */
+              const resetBtn = document.getElementById('reset-checks');
+              resetBtn.addEventListener('click', async () => {
+                if (!confirm('모든 체크를 해제할까요?')) return;
+                photoCards.forEach(img => img.classList.remove('checked'));
+                localStorage.removeItem('userData');
+                await set(ref(db, `users/${ensureMyUUID()}/cards`), {});
+                updateCount();
+              });
+            
+              /* ── “내 UUID 불러오기” 버튼 핸들러 복원 ───────────────── */
+              document.getElementById('load-user-data')
+                .addEventListener('click', () => {
+                  const uid = ensureMyUUID();
+                  document.getElementById('my-uuid').value = uid;
+                  document.getElementById('user-data-modal').style.display = 'block';
+                  document.getElementById('uuid-msg').textContent = '';
+                });
 
             /* ① FAB 눌러 → ‘유저 설정’ 모달 */
             $fab.addEventListener('click', () => $userModal.style.display = 'block');
@@ -843,7 +840,7 @@
             await loadUserData();           // ← 콜백 내부에서만 호출
             fetchAndRenderImages();
 
-        });
+       
         
       </script>
                
