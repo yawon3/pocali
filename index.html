@@ -803,7 +803,13 @@
 
                 // 2) 이미지 로드 대기
                 const imgs = Array.from(grid.querySelectorAll('img'));
-                Promise.all(/* 이미지 로드 대기 */).then(() => {
+                 Promise.all(imgs.map(img => {
+                      if (img.complete) return Promise.resolve();
+                      return new Promise(res => {
+                        img.addEventListener('load',  () => res(), { once: true });
+                        img.addEventListener('error', () => res(), { once: true });
+                      });
+               })).then(() => {
                   html2canvas(grid, { scale:2, backgroundColor:'#fff' })
                   .then(canvas => {
                     // Blob 대신 DataURL로 바로 다운로드
