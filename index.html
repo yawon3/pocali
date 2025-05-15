@@ -792,43 +792,44 @@
               save.style.cssText = `padding:8px 14px; background:#4CAF50; color:#fff; border:none;`;
               
               save.onclick = () => {
-                // 1) 로더 띄우기
-                const loader = document.createElement('div');
-                loader.textContent = '이미지 생성 중…';
-                loader.style.cssText = `
-                  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-                  background:rgba(0,0,0,0.6); color:#fff; font-size:1.2rem; z-index:10000;
-                `;
-                document.body.appendChild(loader);
+              // 1) 로더 띄우기
+              const loader = document.createElement('div');
+              loader.textContent = '이미지 생성 중…';
+              loader.style.cssText = `
+                position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+                background:rgba(0,0,0,0.6); color:#fff; font-size:1.2rem; z-index:10000;
+              `;
+              document.body.appendChild(loader);
 
-                // 2) 이미지 로드 대기
-                const imgs = Array.from(grid.querySelectorAll('img'));
-                 Promise.all(imgs.map(img => {
-                      if (img.complete) return Promise.resolve();
-                      return new Promise(res => {
-                        img.addEventListener('load',  () => res(), { once: true });
-                        img.addEventListener('error', () => res(), { once: true });
-                      });
-               })).then(() => {
-                  html2canvas(grid, { scale:2, backgroundColor:'#fff' })
+              // 2) 이미지 로드 대기
+              const imgs = Array.from(grid.querySelectorAll('img'));
+              Promise.all(imgs.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(res => {
+                  img.addEventListener('load',  () => res(), { once: true });
+                  img.addEventListener('error', () => res(), { once: true });
+                });
+              })).then(() => {
+                // 3) 모두 로드된 후 캡처
+                html2canvas(grid, { scale:2, backgroundColor:'#fff' })
                   .then(canvas => {
-                    // Blob 대신 DataURL로 바로 다운로드
+                    // 4) DataURL 로 바로 다운로드
                     const dataURL = canvas.toDataURL('image/png');
-                    const a = document.createElement('a');
-                    a.href = dataURL;
-                    a.download = `pocalist_sheet_${Date.now()}.png`;
+                    const a       = document.createElement('a');
+                    a.href        = dataURL;
+                    a.download    = `pocalist_sheet_${Date.now()}.png`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    document.body.removeChild(loader);
                   })
                   .catch(err => {
                     alert('캡처 실패: ' + err.message);
+                  })
+                  .finally(() => {
                     document.body.removeChild(loader);
                   });
-
-                });
-              };
+              });
+            };
 
               // DataURL 방식 다운로드 헬퍼  
               function downloadUsingDataURL(dataURL) {
