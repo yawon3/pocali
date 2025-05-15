@@ -832,13 +832,13 @@
                 renderNextBatch();
               }
             });
-         
-              
+          // ── 초기화 흐름 (여기로 옮겼습니다)
+           ensureMyUUID();
+           await loadUserData();
+           fetchAndRenderImages();
+       
           
-         // ── 초기화 흐름 ──────────────────────────────────────
-          ensureMyUUID();
-            await loadUserData();       // 이제 async 콜백 안이므로 정상 동작
-            fetchAndRenderImages();
+         
           });
                 
         
