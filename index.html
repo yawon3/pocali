@@ -780,7 +780,44 @@
               const save  = document.createElement('button');
               save.textContent = '이미지 저장';
               save.style.cssText = `padding:8px 14px; background:#4CAF50; color:#fff; border:none;`;
-              save.onclick  = () => downloadAsImage(grid);  // grid에 흰 배경을 줬으니, grid만 캡처해도 OK
+              save.onclick = () => {
+              // ① 로더 띄우기
+              const loader = document.createElement('div');
+              loader.textContent = '이미지 생성 중…';
+              loader.style.cssText = `
+                position:fixed; inset:0; display:flex; align-items:center;
+                justify-content:center; background:rgba(0,0,0,.6); color:#fff;
+                font-size:1.2rem; z-index:10000;
+              `;
+              document.body.appendChild(loader);
+
+              // ② 그리드 안의 모든 <img>가 load 또는 error 될 때까지 기다리기
+              const imgs = Array.from(grid.querySelectorAll('img'));
+              Promise.all(imgs.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(res => {
+                  img.addEventListener('load',  res, { once: true });
+                  img.addEventListener('error', res, { once: true });
+                });
+              })).then(() => {
+                // ③ 모두 로딩 후에야 캡처
+                html2canvas(grid, {
+                  scale: 2,
+                  useCORS: true,
+                  backgroundColor: '#fff'
+                }).then(canvas => {
+                  const link = document.createElement('a');
+                  link.download = `pocalist_sheet_${Date.now()}.png`;
+                  link.href = canvas.toDataURL('image/png');
+                  link.click();
+                }).catch(err => {
+                  alert('저장 실패: ' + err.message);
+                }).finally(() => {
+                  document.body.removeChild(loader);
+                });
+              });
+            };
+
 
               btnBar.append(close, save);
 
@@ -798,7 +835,7 @@
               document.body.appendChild(loader);
 
               html2canvas(target, {
-                scale: 2,               // 너무 크면 브라우저 메모리 이슈가 생길 수 있으니 적당히
+                scale: 1.5,               // 너무 크면 브라우저 메모리 이슈가 생길 수 있으니 적당히
                 useCORS: true,          // 위 crossOrigin 허용
                 backgroundColor: '#fff' // 투명 배경 대신 흰색
               }).then(canvas => {
