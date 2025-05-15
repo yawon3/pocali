@@ -398,7 +398,7 @@
           
             /** 친구 보유 카드 표시 */
             async function loadFriendDeck (uuid) {
-              const res = await fetch(`/api/friend/${uuid}/collection`);
+              const res = await fetch(`https://pocali-backend.onrender.com/api/friend/${uuid}/collection`);
               if (!res.ok) {
                 alert('친구 데이터를 불러올 수 없습니다.');
                 return;
@@ -621,7 +621,7 @@
               const friend = $('#friend-uuid').value.trim();
               if (!me || !friend) { alert('UUID를 입력하세요!'); return; }
 
-              const ok = await fetch('/api/friends', {
+              const ok = await fetch('https://pocali-backend.onrender.com/api/friends', {
                 method : 'POST',
                 headers: { 'Content-Type':'application/json' },
                 body   : JSON.stringify({ me, friend })
