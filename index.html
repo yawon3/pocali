@@ -191,6 +191,50 @@
         progressEl.textContent = `${loaded}/${total} (${progress}%)`;
         }
         }
+        // 🔥 간단한 해결책: 타이머 기반 로딩 화면 (pocalist 스크립트 맨 위에 추가)
+
+        document.addEventListener('DOMContentLoaded', () => {
+          // 3초 후 자동으로 로딩 화면 숨기기
+          setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+              loadingScreen.style.opacity = '0';
+              loadingScreen.style.transition = 'opacity 0.5s';
+              setTimeout(() => loadingScreen.remove(), 500);
+            }
+          }, 3000);
+
+          // 또는 첫 이미지 로드 감지 후 숨기기
+          let firstImageLoaded = false;
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.type === 'childList') {
+                const firstImg = document.querySelector('.photo-card');
+                if (firstImg && !firstImageLoaded) {
+                  firstImg.addEventListener('load', () => {
+                    if (!firstImageLoaded) {
+                      firstImageLoaded = true;
+                      const loadingScreen = document.getElementById('loading-screen');
+                      if (loadingScreen) {
+                        loadingScreen.style.opacity = '0';
+                        loadingScreen.style.transition = 'opacity 0.5s';
+                        setTimeout(() => loadingScreen.remove(), 500);
+                      }
+                    }
+                  });
+                }
+              }
+            });
+          });
+
+          // photo-grid 변화 관찰
+          const photoGrid = document.getElementById('photo-grid');
+          if (photoGrid) {
+            observer.observe(photoGrid, { childList: true, subtree: true });
+          }
+        });
+
+
         </script>
        <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
       <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
