@@ -727,137 +727,136 @@
                 if (e.target === detailSearchModal) detailSearchModal.style.display = 'none';
               });
 
-                function generateImageSheet(nodes) {
-                // ① 오버레이 생성
-                const overlay = document.createElement('div');
-                overlay.id = 'sheet-overlay';
-                overlay.style.cssText = `
-                  position:fixed; inset:0; background:#fff; overflow:auto;
-                  z-index:10000; padding:20px; overscroll-behavior:contain;
-                `;
-                document.body.appendChild(overlay);
+              function generateImageSheet(nodes) {
+              // ① 오버레이 생성
+              const overlay = document.createElement('div');
+              overlay.id = 'sheet-overlay';
+              overlay.style.cssText = `
+                position:fixed; inset:0; background:#fff; overflow:auto;
+                z-index:10000; padding:20px; overscroll-behavior:contain;
+              `;
+              document.body.appendChild(overlay);
 
-                // ② 시트 전용 그리드
-                const sheetGrid = document.createElement('div');
-                sheetGrid.id = 'sheet-grid';
-                sheetGrid.style.cssText = `
-                  display: grid;
-                  grid-template-columns: repeat(auto-fill, 100px);
-                  grid-auto-rows: auto;
-                  gap: 12px;
-                  padding: 20px;
-                  width: fit-content;
-                  min-width: 80%;
-                `;
-                overlay.appendChild(sheetGrid);
+              // ② 시트 전용 그리드
+              const sheetGrid = document.createElement('div');
+              sheetGrid.id = 'sheet-grid';
+              sheetGrid.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(20, 100px);
+                grid-auto-rows: auto;
+                gap: 12px;
+                padding: 20px;
+                width: fit-content;
+              `;
+              overlay.appendChild(sheetGrid);
 
-                // ③ 닫기/저장 버튼
-                const btnBar = document.createElement('div');
-                btnBar.style.cssText = 'position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:10001;';
-                
-                const closeBtn = document.createElement('button');
-                closeBtn.textContent = '닫기';
-                closeBtn.onclick = () => overlay.remove();
-                
-                const saveBtn = document.createElement('button');
-                saveBtn.textContent = '저장';
-                saveBtn.onclick = async () => {
-                  try {
-                    // 상태 표시
-                    const status = document.createElement('div');
-                    status.textContent = "이미지 생성 중...";
-                    status.style.cssText = 'position:fixed; bottom:20px; left:20px; background:rgba(0,0,0,0.7); color:white; padding:10px; border-radius:5px;';
-                    overlay.appendChild(status);
-                    
-                    // 모든 이미지가 로드될 때까지 기다림
-                    const images = Array.from(sheetGrid.querySelectorAll('img'));
-                    await Promise.all(images.map(img => {
-                      // 이미 로드된 이미지는 즉시 해결
-                      if (img.complete) return Promise.resolve();
-                      // 아직 로드되지 않은 이미지는 로드 이벤트 기다림
-                      return new Promise(resolve => {
-                        img.onload = resolve;
-                        img.onerror = resolve; // 에러가 나도 진행
-                      });
-                    }));
-                    
-                    console.log('모든 이미지 로드 완료, html2canvas 시작');
-                    status.textContent = "캔버스 생성 중...";
-                    
-                    const canvas = await html2canvas(sheetGrid, {
-                      scale: 2,
-                      backgroundColor: '#fff',
-                      useCORS: true,
-                      allowTaint: true,
-                      logging: true, // 디버깅 정보 출력
-                      onclone: (clonedDoc) => {
-                        // 복제된 DOM의 모든 이미지에 crossOrigin 설정
-                        const clonedImages = clonedDoc.querySelectorAll('img');
-                        clonedImages.forEach(img => {
-                          img.crossOrigin = 'anonymous';
-                        });
-                      }
+              // ③ 닫기/저장 버튼
+              const btnBar = document.createElement('div');
+              btnBar.style.cssText = 'position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:10001;';
+              
+              const closeBtn = document.createElement('button');
+              closeBtn.textContent = '닫기';
+              closeBtn.onclick = () => overlay.remove();
+              
+              const saveBtn = document.createElement('button');
+              saveBtn.textContent = '저장';
+              saveBtn.onclick = async () => {
+                try {
+                  // 상태 표시
+                  const status = document.createElement('div');
+                  status.textContent = "이미지 생성 중...";
+                  status.style.cssText = 'position:fixed; bottom:20px; left:20px; background:rgba(0,0,0,0.7); color:white; padding:10px; border-radius:5px; z-index:10002;';
+                  overlay.appendChild(status);
+                  
+                  // 모든 이미지가 로드될 때까지 기다림
+                  const images = Array.from(sheetGrid.querySelectorAll('img'));
+                  await Promise.all(images.map(img => {
+                    // 이미 로드된 이미지는 즉시 해결
+                    if (img.complete) return Promise.resolve();
+                    // 아직 로드되지 않은 이미지는 로드 이벤트 기다림
+                    return new Promise(resolve => {
+                      img.onload = resolve;
+                      img.onerror = resolve; // 에러가 나도 진행
                     });
-                    
-                    console.log('캔버스 크기:', canvas.width, '×', canvas.height);
-                    status.textContent = "이미지 다운로드 중...";
-                    
-                    // canvas를 데이터 URL로 변환하여 다운로드
-                    const dataURL = canvas.toDataURL('image/png');
-                    const a = document.createElement('a');
-                    a.href = dataURL;
-                    a.download = `pocalist_sheet_${Date.now()}.png`;
-                    a.click();
-                    
-                    overlay.removeChild(status);
-                  } catch (e) {
-                    console.error('캡처 중 오류 발생:', e);
-                    alert('캡처 실패: ' + e.message);
+                  }));
+                  
+                  console.log('모든 이미지 로드 완료, html2canvas 시작');
+                  status.textContent = "캔버스 생성 중...";
+                  
+                  const canvas = await html2canvas(sheetGrid, {
+                    scale: 2,
+                    backgroundColor: '#fff',
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: true, // 디버깅 정보 출력
+                    onclone: (clonedDoc) => {
+                      // 복제된 DOM의 모든 이미지에 crossOrigin 설정
+                      const clonedImages = clonedDoc.querySelectorAll('img');
+                      clonedImages.forEach(img => {
+                        img.crossOrigin = 'anonymous';
+                        // 불투명도는 그대로 유지
+                      });
+                    }
+                  });
+                  
+                  console.log('캔버스 크기:', canvas.width, '×', canvas.height);
+                  status.textContent = "이미지 다운로드 중...";
+                  
+                  // canvas를 데이터 URL로 변환하여 다운로드
+                  const dataURL = canvas.toDataURL('image/png');
+                  const a = document.createElement('a');
+                  a.href = dataURL;
+                  a.download = `pocalist_sheet_${Date.now()}.png`;
+                  a.click();
+                  
+                  overlay.removeChild(status);
+                } catch (e) {
+                  console.error('캡처 중 오류 발생:', e);
+                  alert('캡처 실패: ' + e.message);
+                }
+              };
+              
+              btnBar.append(closeBtn, saveBtn);
+              overlay.appendChild(btnBar);
+
+              // ④ 노드 복제해서 시트에 추가 (이미지 로딩 처리 개선)
+              nodes.forEach(n => {
+                const container = document.createElement('div');
+                container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center;';
+                
+                const img = new Image();
+                img.crossOrigin = 'anonymous'; // CORS 문제 해결을 위해 필수
+                img.className = 'photo-card';
+                img.style.cssText = 'max-width:100%; max-height:140px; object-fit:contain;';
+                
+                // 체크 상태에 따라 불투명도 설정
+                if (n.classList.contains('checked')) {
+                  img.style.opacity = '1'; // 보유 카드는 100% 불투명도
+                } else {
+                  img.style.opacity = '0.4'; // 미보유 카드는 40% 불투명도
+                }
+                
+                // 원본 소스와 데이터셋 복사
+                img.src = n.src;
+                img.alt = n.alt;
+                
+                // 로딩 표시기
+                const loader = document.createElement('div');
+                loader.textContent = '로딩중...';
+                loader.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.8);';
+                container.appendChild(loader);
+                
+                // 이미지 로드 완료 시 로딩 표시기 제거
+                img.onload = () => {
+                  if (loader.parentNode === container) {
+                    container.removeChild(loader);
                   }
                 };
                 
-                btnBar.append(closeBtn, saveBtn);
-                overlay.appendChild(btnBar);
-
-                // ④ 노드 복제해서 시트에 추가 (이미지 로딩 처리 개선)
-                nodes.forEach(n => {
-                  const container = document.createElement('div');
-                  container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center;';
-                  
-                  const img = new Image();
-                  img.crossOrigin = 'anonymous'; // CORS 문제 해결을 위해 필수
-                  img.className = 'photo-card';
-                  img.style.cssText = 'max-width:100%; max-height:140px; object-fit:contain;';
-                  
-                  // 원본 소스와 데이터셋 복사
-                  img.src = n.src;
-                  img.alt = n.alt;
-                  
-                  // 로딩 표시기
-                  const loader = document.createElement('div');
-                  loader.textContent = '로딩중...';
-                  loader.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.8);';
-                  container.appendChild(loader);
-                  
-                  // 이미지 로드 완료 시 로딩 표시기 제거
-                  img.onload = () => {
-                    if (loader.parentNode === container) {
-                      container.removeChild(loader);
-                    }
-                  };
-                  
-                  // 체크 상태 표시 (있는 경우)
-                  if (n.classList.contains('checked')) {
-                    const checkedMark = document.createElement('div');
-                    checkedMark.textContent = '✓';
-                    checkedMark.style.cssText = 'position:absolute; top:5px; right:5px; width:20px; height:20px; background:green; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-weight:bold;';
-                    container.appendChild(checkedMark);
-                  }
-                  
-                  container.appendChild(img);
-                  sheetGrid.appendChild(container);
-                });
-              }
+                container.appendChild(img);
+                sheetGrid.appendChild(container);
+              });
+            }
 
               
             // ─── 페이징별 렌더링 함수 ─────────────────────────
