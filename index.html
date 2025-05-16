@@ -175,7 +175,7 @@
           let currentView       = 'id';      // 'id'  | 'category'
           let viewOwner         = 'self';    // 'self'| 'friend'
           let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
-          let friendCollection = {};
+          let userData          = {};        // 현재 보여지는 데이터 (내 것 또는 친구 것)
           
           const advancedFilters = { groups: [], members: [] };
           
@@ -410,62 +410,71 @@
               else                            showById(filtered);
             }
 
+             // ✅ 덱 전환 기능 수정
+          /** 내 보유 카드 표시 */
+          function loadSelfDeck() {
+            const myData = JSON.parse(localStorage.getItem('userData') || '{}');
+            userData = myData;
             
+            photoCards.forEach(img => {
+              img.classList.toggle('checked', !!myData[img.dataset.unique]);
+              img.style.pointerEvents = ''; // 더블클릭 허용
+            });
           
-            /* ─────────────────────────────────────────────
-               4. 덱 전환 (loadSelfDeck / loadFriendDeck)
-               ───────────────────────────────────────────── */
-            /** 내 보유 카드 표시 */
-            function loadSelfDeck () {
-              const myData = JSON.parse(localStorage.getItem('userData') || '{}');
-              userData    = myData;                 // ← 전역 변수도 업데이트
-              photoCards.forEach(img => {
-                img.classList.toggle('checked', !!myData[img.dataset.unique]);
-                img.style.pointerEvents = '';        // 더블클릭 허용
-              });
+            viewOwner = 'self';
+            $viewToggleBtn.textContent = '👥 친구보기';
+            updateCount();
+          }
           
-              viewOwner   = 'self';
-              $viewToggleBtn.textContent = '👥 친구보기';
-              updateCount();
-            }
-          
-            /** 친구 보유 카드 표시 */
-            async function loadFriendDeck (uuid) {
-            // ❶ 친구 데이터를 전역 변수에 저장
-            friendCollection = {};
+          /** 친구 보유 카드 표시 */
+          async function loadFriendDeck(uuid) {
+            try {
               const res = await fetch(`https://pocali-backend.onrender.com/api/friend/${uuid}/collection`);
               if (!res.ok) {
                 alert('친구 데이터를 불러올 수 없습니다.');
-                return;
+                return false;
               }
           
               const friendData = (await res.json()).data || {};
-              friendCollection = friendData;
+              userData = friendData; // 현재 보여지는 데이터를 친구 데이터로 설정
+              
               photoCards.forEach(img => {
                 img.classList.toggle('checked', !!friendData[img.dataset.unique]);
-                img.style.pointerEvents = 'none';   // 수정 금지
+                img.style.pointerEvents = 'none'; // 수정 금지
               });
           
-              viewOwner         = 'friend';
+              viewOwner = 'friend';
               currentFriendUUID = uuid;
               localStorage.setItem('lastFriendUUID', uuid);
-          
               $viewToggleBtn.textContent = '👤 내 카드보기';
               updateCount();
+              return true;
+            } catch (error) {
+              console.error('친구 덱 로드 실패:', error);
+              alert('친구 데이터 로드 중 오류가 발생했습니다.');
+              return false;
             }
-          
-            /* 전역(콘솔)에서도 호출할 수 있도록 */
-            window.loadSelfDeck   = loadSelfDeck;
-            window.loadFriendDeck = loadFriendDeck;
-          
-                       
-          
-            /* 5-2. “친구보기 ↔ 내카드보기” 토글 버튼 */
-            $viewToggleBtn.addEventListener('click', () => {
-              if (viewOwner === 'friend') loadSelfDeck();
-              else if (currentFriendUUID) loadFriendDeck(currentFriendUUID);
-              else alert('먼저 친구를 추가하세요!');
-            });
+          }
+
+          // ✅ 뷰 토글 버튼 이벤트 (중복 제거)
+          $viewToggleBtn.addEventListener('click', async () => {
+            if (viewOwner === 'friend') {
+              loadSelfDeck();
+            } else {
+              if (currentFriendUUID) {
+                await loadFriendDeck(currentFriendUUID);
+              } else {
+                alert('먼저 친구를 추가하세요!');
+              }
+            }
+          });
+
+          // 초기 로드
+          fetchAndRenderImages()
+            .then(() => {
+              loadSelfDeck(); // 초기에는 내 덱 로드
+            })
+            .catch(console.error);
           
             /* 5-3. 좌측 하단 카테고리/ID 전환 버튼 */
             $catToggleBtn.addEventListener('click', () => {
