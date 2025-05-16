@@ -742,9 +742,13 @@
                 const sheetGrid = document.createElement('div');
                 sheetGrid.id = 'sheet-grid';
                 sheetGrid.style.cssText = `
-                  display:grid;
-                  grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
-                  gap:12px;
+                   display: grid;
+                    /* 한 줄짜리 그리드로, 각 칸 너비 100px */
+                    grid-auto-flow: column;
+                    grid-auto-columns: 100px;
+                    gap: 12px;
+                    /* 넘칠 때 가로 스크롤 */
+                    width: max-content;
                 `;
                 overlay.appendChild(sheetGrid);
 
@@ -759,6 +763,7 @@
                 saveBtn.onclick = () => {
                   html2canvas(sheetGrid, { scale:2, backgroundColor:'#fff', useCORS:true })
                     .then(canvas => {
+                      console.log('캔버스 크기:', canvas.width, '×', canvas.height);
                       const a = document.createElement('a');
                       a.href = canvas.toDataURL('image/png');
                       a.download = `pocalist_sheet_${Date.now()}.png`;
@@ -771,11 +776,10 @@
 
                 // ④ 노드 복제해서 시트에 추가
                 nodes.forEach(n => {
-                  const img = n.cloneNode();
-                  img.style.width = '100%';
-                  img.style.borderRadius = '0';
-                  sheetGrid.appendChild(img);
-                });
+                const img = n.cloneNode();
+                console.log('복제한 img src:', img.src);
+                sheetGrid.appendChild(img);
+              });
               }
 
 
