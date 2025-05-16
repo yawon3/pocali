@@ -175,6 +175,7 @@
           let currentView       = 'id';      // 'id'  | 'category'
           let viewOwner         = 'self';    // 'self'| 'friend'
           let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
+          let friendCollection = {};
           
           const advancedFilters = { groups: [], members: [] };
           
@@ -430,6 +431,8 @@
           
             /** 친구 보유 카드 표시 */
             async function loadFriendDeck (uuid) {
+            // ❶ 친구 데이터를 전역 변수에 저장
+            friendCollection = {};
               const res = await fetch(`https://pocali-backend.onrender.com/api/friend/${uuid}/collection`);
               if (!res.ok) {
                 alert('친구 데이터를 불러올 수 없습니다.');
@@ -437,6 +440,7 @@
               }
           
               const friendData = (await res.json()).data || {};
+              friendCollection = friendData;
               photoCards.forEach(img => {
                 img.classList.toggle('checked', !!friendData[img.dataset.unique]);
                 img.style.pointerEvents = 'none';   // 수정 금지
@@ -889,10 +893,17 @@
               img.dataset.unique  = image.unique_id;
 
               // ── 로컬 저장소(userData)에 있던 체크 정보 재적용
-              const saved = JSON.parse(localStorage.getItem('userData') || '{}');
-              if (saved[image.unique_id]) {
-                img.classList.add('checked');
-              }
+              if (viewOwner === 'friend') {
+              // 친구 보기: friendCollection 사용, 수정 금지
+              const own = !!friendCollection[image.unique_id];
+                img.classList.toggle('checked', own);
+                img.style.pointerEvents = 'none';
+                } else {
+              // 내 보기: localStorage userData 사용, 더블클릭 허용
+                const saved = JSON.parse(localStorage.getItem('userData') || '{}');
+                img.classList.toggle('checked', !!saved[image.unique_id]);
+                img.style.pointerEvents = '';
+                          }
 
 
               // 3) 오버레이: image.type 또는 백엔드 file_type 활용
