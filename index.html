@@ -743,9 +743,9 @@
               sheetGrid.style.cssText = `
                 display: grid;
                 grid-template-columns: repeat(20, 100px);
-                grid-auto-rows: 230px; /* 자동 대신 고정 높이 설정 */
-                gap: 10px;
-                padding: 10px;
+                grid-auto-rows: auto;
+                gap: 5px;
+                padding: 20px;
                 width: fit-content;
               `;
               overlay.appendChild(sheetGrid);
