@@ -154,7 +154,7 @@
             </div>
         </div>
 
-        <!-- HTML에 로딩 화면 추가 -->
+       <!-- HTML에 로딩 화면 추가 (퍼센트 제거 버전) -->
         <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
         background: #f5f5f5; display: flex; flex-direction: column; 
         align-items: center; justify-content: center; z-index: 9999;">
@@ -162,7 +162,6 @@
               border-top: 4px solid #3498db; border-radius: 50%; 
               animation: spin 1s linear infinite;"></div>
         <p style="margin-top: 20px; font-size: 18px; color: #666;">포토카드 로딩 중...</p>
-        <p id="loading-progress" style="font-size: 14px; color: #999;">0%</p>
         </div>
 
         <style>
@@ -183,58 +182,47 @@
         }
         }
 
-        // 로딩 진행률 업데이트
-        function updateLoadingProgress(loaded, total) {
-        const progress = Math.round((loaded / total) * 100);
-        const progressEl = document.getElementById('loading-progress');
-        if (progressEl) {
-        progressEl.textContent = `${loaded}/${total} (${progress}%)`;
-        }
-        }
-        // 🔥 간단한 해결책: 타이머 기반 로딩 화면 (pocalist 스크립트 맨 위에 추가)
-
+        // 🔥 자동 숨김 스크립트
         document.addEventListener('DOMContentLoaded', () => {
-          // 3초 후 자동으로 로딩 화면 숨기기
-          setTimeout(() => {
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen) {
-              loadingScreen.style.opacity = '0';
-              loadingScreen.style.transition = 'opacity 0.5s';
-              setTimeout(() => loadingScreen.remove(), 500);
-            }
-          }, 3000);
+        // 3초 후 자동으로 로딩 화면 숨기기
+        setTimeout(() => {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.transition = 'opacity 0.5s';
+        setTimeout(() => loadingScreen.remove(), 500);
+        }
+        }, 3000);
 
-          // 또는 첫 이미지 로드 감지 후 숨기기
-          let firstImageLoaded = false;
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-              if (mutation.type === 'childList') {
-                const firstImg = document.querySelector('.photo-card');
-                if (firstImg && !firstImageLoaded) {
-                  firstImg.addEventListener('load', () => {
-                    if (!firstImageLoaded) {
-                      firstImageLoaded = true;
-                      const loadingScreen = document.getElementById('loading-screen');
-                      if (loadingScreen) {
-                        loadingScreen.style.opacity = '0';
-                        loadingScreen.style.transition = 'opacity 0.5s';
-                        setTimeout(() => loadingScreen.remove(), 500);
-                      }
-                    }
-                  });
-                }
-              }
-            });
-          });
-
-          // photo-grid 변화 관찰
-          const photoGrid = document.getElementById('photo-grid');
-          if (photoGrid) {
-            observer.observe(photoGrid, { childList: true, subtree: true });
-          }
+        // 첫 이미지 로드 감지 후 숨기기
+        let firstImageLoaded = false;
+        const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+        const firstImg = document.querySelector('.photo-card');
+        if (firstImg && !firstImageLoaded) {
+        firstImg.addEventListener('load', () => {
+        if (!firstImageLoaded) {
+        firstImageLoaded = true;
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.transition = 'opacity 0.5s';
+        setTimeout(() => loadingScreen.remove(), 500);
+        }
+        }
+        });
+        }
+        }
+        });
         });
 
-
+        // photo-grid 변화 관찰
+        const photoGrid = document.getElementById('photo-grid');
+        if (photoGrid) {
+        observer.observe(photoGrid, { childList: true, subtree: true });
+        }
+        });
         </script>
        <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
       <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
