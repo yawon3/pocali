@@ -749,9 +749,9 @@
                 }, { passive: false });
             
                 /* 4-2. 시트 전용 그리드 컨테이너 */
-                const sheetGrid = document.createElement('div');
-                sheetGrid.id = "sheet-grid";
-                grid.style.cssText = `
+                  const sheetGrid = document.createElement('div');
+                  sheetGrid.id = "sheet-grid";
+                  sheetGrid.style.cssText = `
                   display: grid;
                   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                   gap: 12px;
@@ -759,7 +759,7 @@
                   background: #fff;
                   padding: 20px;
                 `;
-                overlay.appendChild(grid);
+                overlay.appendChild(sheetGrid);
 
                 // 로더 (상태 표시)
                 const statusDiv = document.createElement('div');
@@ -884,7 +884,7 @@
                   document.body.appendChild(loader);
 
                   try {
-                    // 2) grid 안의 모든 <img>가 로드될 때까지 대기
+                     // 2) sheetGrid 안의 모든 <img>가 로드될 때까지 대기
                     const imgs = Array.from(sheetGrid.querySelectorAll('img'));
                     await Promise.all(imgs.map(img => new Promise(res => {
                       if (img.complete && img.naturalWidth > 0) return res();
@@ -896,10 +896,8 @@
                     loader.textContent = '캡처 중…';
                     await new Promise(r => setTimeout(r, 300)); // 약간의 여유
 
-                  
-                    // 4) html2canvas 호출: 오직 외부에서 선언된 grid 사용
-                    const canvas = await html2canvas(shddtGrid, { scale:2, backgroundColor:'#fff', useCORS: true });
-
+                    // 4) html2canvas 호출: 오직 sheetGrid 만 캡처
+                    const canvas = await html2canvas(sheetGrid,    { scale:2, backgroundColor:'#fff', useCORS: true });
                     // 5) DataURL로 바로 다운로드
                     const dataURL = canvas.toDataURL('image/png');
                     const a = document.createElement('a');
