@@ -155,7 +155,113 @@
         </div>
        <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
       <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
+      <script>
+        // 🔒 기본적인 소스코드 보호 + 강력한 대응
+        (function() {
+          // 우클릭 방지
+          document.addEventListener('contextmenu', e => e.preventDefault());
+          
+          // 개발자도구 키보드 방지
+          document.addEventListener('keydown', e => {
+            // F12
+            if (e.keyCode === 123) e.preventDefault();
+            // Ctrl+Shift+I (개발자도구)
+            if (e.ctrlKey && e.shiftKey && e.keyCode === 73) e.preventDefault();
+            // Ctrl+Shift+J (콘솔)
+            if (e.ctrlKey && e.shiftKey && e.keyCode === 74) e.preventDefault();
+            // Ctrl+U (소스보기)
+            if (e.ctrlKey && e.keyCode === 85) e.preventDefault();
+          });
+          
+          // 텍스트 선택 방지
+          document.addEventListener('selectstart', e => e.preventDefault());
+          
+          let devToolsDetected = false;
+          
+          // 개발자도구 감지 + 강력한 대응
+          function handleDevToolsDetection() {
+            // 옵션 1: 구글로 리다이렉트
+            window.location.href = 'https://www.google.com';
+            
+            // 옵션 2: 현재 탭을 새 탭으로 변경 (뒤로가기 방지)
+            // window.location.replace('https://www.google.com');
+            
+            // 옵션 3: 페이지 내용을 완전히 대체
+            /*
+            document.head.innerHTML = '<title>접근 거부</title>';
+            document.body.innerHTML = `
+              <div style="position:fixed; top:0; left:0; width:100%; height:100%; 
+                          background:#ff0000; color:#fff; display:flex; flex-direction:column;
+                          align-items:center; justify-content:center; font-family:Arial;
+                          z-index:999999;">
+                <h1 style="font-size:48px; margin-bottom:20px;">🚫 접근 거부</h1>
+                <p style="font-size:24px; text-align:center;">
+                  개발자도구 사용이 감지되었습니다.<br>
+                  페이지 접근이 차단되었습니다.
+                </p>
+                <button onclick="window.location.href='https://www.google.com'" 
+                        style="margin-top:30px; padding:15px 30px; font-size:18px; 
+                               background:#fff; color:#000; border:none; border-radius:5px; cursor:pointer;">
+                  Google로 이동
+                </button>
+              </div>
+            `;
+            */
+            
+            // 옵션 4: 브라우저 탭 닫기 시도 (팝업으로 열린 창에서만 가능)
+            /*
+            try {
+              window.close();
+            } catch(e) {
+              // 일반 탭에서는 닫기 불가, 리다이렉트로 대체
+              window.location.href = 'https://www.google.com';
+            }
+            */
+          }
+          
+          // 개발자도구 감지
+          setInterval(() => {
+            if (window.outerHeight - window.innerHeight > 200 || 
+                window.outerWidth - window.innerWidth > 200) {
+              if (!devToolsDetected) {
+                devToolsDetected = true;
+                // 1초 후 대응 실행 (혹시 오감지 방지)
+                setTimeout(() => {
+                  handleDevToolsDetection();
+                }, 1000);
+              }
+            } else {
+              devToolsDetected = false;
+            }
+          }, 500);
+          
+          // 추가: Console에 접근하려는 시도 탐지
+          let consoleWarnings = 0;
+          const originalConsole = {
+            log: console.log,
+            error: console.error,
+            warn: console.warn,
+            info: console.info
+          };
+          
+          console.log = function(...args) {
+            consoleWarnings++;
+            if (consoleWarnings > 3) {
+              handleDevToolsDetection();
+            }
+            return originalConsole.log.apply(console, args);
+          };
+          
+          // Console 감지 메시지
+          Object.defineProperty(console, '_commandLineAPI', {
+            get: function() {
+              handleDevToolsDetection();
+              return {};
+            }
+          });
+          
+        })();
+      </script>
       <script>
        /* ==========================================================
    📌 p1ocalist 메인 스크립트 - 완전 수정 버전
