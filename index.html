@@ -891,7 +891,7 @@
 
                     // 3) 캡처 준비
                     loader.textContent = '캡처 중…';
-                    await new Promise(r => setTimeout(r, 500));  // 안정화
+                    await new Promise(r => setTimeout(r, 300)); // 약간의 여유
 
                   
                     // ── 4) 캔버스 생성 (올바른 타겟: grid 전체 높이)
@@ -905,12 +905,10 @@
                     console.log('캔버스 크기:', canvas.width, '×', canvas.height);
 
                     // 5) DataURL로 바로 다운로드
-                    loader.textContent = '다운로드 준비…';
                     const dataURL = canvas.toDataURL('image/png');
-                    console.log('DataURL 길이:', dataURL.length);
-                    const a       = document.createElement('a');
-                    a.href        = dataURL;
-                    a.download    = `pocalist_sheet_${Date.now()}.png`;
+                    const a = document.createElement('a');
+                    a.href       = dataURL;
+                    a.download   = `pocalist_sheet_${Date.now()}.png`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
