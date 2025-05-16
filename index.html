@@ -893,9 +893,15 @@
                     loader.textContent = '캡처 중…';
                     await new Promise(r => setTimeout(r, 500));  // 안정화
 
-                    // 4) html2canvas 호출
-                    const overlay = document.getElementById('sheet-overlay');
-                    const canvas  = await html2canvas(overlay, { scale:2, backgroundColor:'#fff', useCORS: true });
+                  
+                    // ── 4) 캔버스 생성 (올바른 타겟: grid 전체 높이)
+                    // → #sheet-grid 요소 전체를 캡처합니다. 스크롤 뒤쪽 카드까지 포함.
+                    const grid   = document.getElementById('sheet-grid');
+                    const canvas = await html2canvas(grid, {
+                      scale: 2,
+                      backgroundColor: '#fff',
+                      useCORS: true
+                    });
                     console.log('캔버스 크기:', canvas.width, '×', canvas.height);
 
                     // 5) DataURL로 바로 다운로드
