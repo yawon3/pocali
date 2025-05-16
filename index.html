@@ -729,7 +729,8 @@
              
             /* 매우 안정적인 이미지 시트 생성 함수 - 딜레이 대폭 증가 및 단계적 처리 */
               async function generateImageSheet(cards) {
-                // ── ① 전체 오버레이: 흰 배경, 내부만 스크롤, 오버플로우 전파 차단
+                    
+                    // ── ① 전체 오버레이: 흰 배경, 내부만 스크롤, 오버플로우 전파 차단
                 const overlay = document.createElement('div');
                 overlay.id = "sheet-overlay"; // ID 추가
                 overlay.style.cssText = `
@@ -742,12 +743,14 @@
                   overscroll-behavior: contain;
                 `;
 
-                // overlay 스크롤 전파 차단 (내부만 스크롤 되게)
-                overlay.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
-
-                /* 4-2. 그리드 */
-                const grid = document.createElement('div');
-                grid.id = "sheet-grid"; // ID 추가
+                // ── overlay 가 바깥 컨테이너로 휠 이벤트 전파하지 않도록
+                overlay.addEventListener('wheel', e => {
+                  e.stopPropagation();
+                }, { passive: false });
+            
+                /* 4-2. 시트 전용 그리드 컨테이너 */
+                const sheetGrid = document.createElement('div');
+                sheetGrid.id = "sheet-grid";
                 grid.style.cssText = `
                   display: grid;
                   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -882,7 +885,7 @@
 
                   try {
                     // 2) grid 안의 모든 <img>가 로드될 때까지 대기
-                    const imgs = Array.from(grid.querySelectorAll('img'));
+                    const imgs = Array.from(sheetGrid.querySelectorAll('img'));
                     await Promise.all(imgs.map(img => new Promise(res => {
                       if (img.complete && img.naturalWidth > 0) return res();
                       img.onload  = () => res();
@@ -894,9 +897,8 @@
                     await new Promise(r => setTimeout(r, 300)); // 약간의 여유
 
                   
-                    // 4) html2canvas 호출: 오직 #sheet-grid 만 캡처
-                    const grid    = document.getElementById('sheet-grid');
-                    const canvas  = await html2canvas(grid,    { scale:2, backgroundColor:'#fff', useCORS: true });
+                    // 4) html2canvas 호출: 오직 외부에서 선언된 grid 사용
+                    const canvas = await html2canvas(shddtGrid, { scale:2, backgroundColor:'#fff', useCORS: true });
 
                     // 5) DataURL로 바로 다운로드
                     const dataURL = canvas.toDataURL('image/png');
