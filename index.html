@@ -894,15 +894,14 @@
                     await new Promise(r => setTimeout(r, 500));  // 안정화
 
                     // 4) html2canvas 호출
-                    const canvas = await html2canvas(grid, {
-                      scale: 2,
-                      backgroundColor: '#fff',
-                      useCORS: true
-                    });
+                    const overlay = document.getElementById('sheet-overlay');
+                    const canvas  = await html2canvas(overlay, { scale:2, backgroundColor:'#fff', useCORS: true });
+                    console.log('캔버스 크기:', canvas.width, '×', canvas.height);
 
                     // 5) DataURL로 바로 다운로드
                     loader.textContent = '다운로드 준비…';
                     const dataURL = canvas.toDataURL('image/png');
+                    console.log('DataURL 길이:', dataURL.length);
                     const a       = document.createElement('a');
                     a.href        = dataURL;
                     a.download    = `pocalist_sheet_${Date.now()}.png`;
