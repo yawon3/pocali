@@ -894,15 +894,9 @@
                     await new Promise(r => setTimeout(r, 300)); // 약간의 여유
 
                   
-                    // ── 4) 캔버스 생성 (올바른 타겟: grid 전체 높이)
-                    // → #sheet-grid 요소 전체를 캡처합니다. 스크롤 뒤쪽 카드까지 포함.
-                    const grid   = document.getElementById('sheet-grid');
-                    const canvas = await html2canvas(grid, {
-                      scale: 2,
-                      backgroundColor: '#fff',
-                      useCORS: true
-                    });
-                    console.log('캔버스 크기:', canvas.width, '×', canvas.height);
+                    // 4) html2canvas 호출: 오직 #sheet-grid 만 캡처
+                    const grid    = document.getElementById('sheet-grid');
+                    const canvas  = await html2canvas(grid,    { scale:2, backgroundColor:'#fff', useCORS: true });
 
                     // 5) DataURL로 바로 다운로드
                     const dataURL = canvas.toDataURL('image/png');
