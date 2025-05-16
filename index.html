@@ -157,825 +157,773 @@
         <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
         <script>
-          /* ==========================================================
-             📌 pocalist 메인 스크립트
-             (2024-04-28 - 리팩터: 가독성 ↑ / 중복 ↓)
-             ========================================================== */
+        /* ==========================================================
+          📌 pocalist 메인 스크립트 - 덱 전환 완전 수정 버전
+          ========================================================== */
+
+        /* ───────────────────────────────────────────────
+          0. 전역 상태 및 도우미
+          ─────────────────────────────────────────────── */
+        // ─── 페이징용 전역 변수 ─────────────────────────
+        const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
+        let backupAllImages = [];       // allImages 원본 백업용
+        let allImages      = [];       // 전체 이미지 메타데이터 저장
+        let currentBatch   = 0;        // 렌더된 배치 인덱스
+        let isRendering    = false;    // 중복 렌더링 방지 플래그
+        let totalCount     = 0;        // ← 전체 개수 헤더에서 읽어 저장
+        let currentView       = 'id';      // 'id'  | 'category'
+        let viewOwner         = 'self';    // 'self'| 'friend'
+        let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
+        let userData          = {};        // 현재 보여지는 데이터 (내 것 또는 친구 것)
+
+        const advancedFilters = { groups: [], members: [] };
+
+        /* 짧은 셀렉터 도우미 */
+        function $(sel,  scope=document) { return scope.querySelector(sel); }
+        function $$(sel, scope=document) { return Array.from(scope.querySelectorAll(sel)); }
+
+        /* ── 공통: 이미지 상세 모달 ───────────────────────── */
+        function showModal(img) {
+          const $modal      = $('#photo-modal');
+          const $modalImg   = $('#modal-image');
+          const $modalInfo  = $('#modal-info');
+
+          $modalImg.src = img.src;
+
+          $modalInfo.innerHTML = `
+            <p>${img.dataset.group   || ''}</p>
+            <p>${img.dataset.member  || ''}</p>
+            <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+            <p>${img.dataset.version || ''}</p>
+            <p>#${img.dataset.unique}</p>
+          `;
+
+          $modal.style.display = 'block';
+        }
+          // 모달 전체에서 우클릭 메뉴 차단
+          $('#photo-modal').addEventListener('contextmenu', e => e.preventDefault());
+          // 모달 안 이미지에서도 우클릭 메뉴 차단
+          $('#modal-image').addEventListener('contextmenu', e => e.preventDefault());
+
+        /* X 버튼 -or- 바깥 클릭 → 모달 닫기 */
+        $('#modal-close').addEventListener('click', () => $('#photo-modal').style.display = 'none');
+        $('#photo-modal').addEventListener('click', e => {
+          if (e.target === $('#photo-modal')) $('#photo-modal').style.display = 'none';
+        });
+
+        /* ───────────────────────────────────────────────
+          1. 초기화 및 메인 기능들
+          ─────────────────────────────────────────────── */
+        document.addEventListener('DOMContentLoaded', () => {
+          // ── export-modal 닫기 핸들러
+          const $exportModal      = document.getElementById('export-modal');
+          const $exportModalClose = document.getElementById('export-modal-close');
           
-          /* ───────────────────────────────────────────────
-             0. 전역 상태 및 도우미
-             ─────────────────────────────────────────────── */
-          // ─── 페이징용 전역 변수 ─────────────────────────
-          const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
-          let backupAllImages = [];       // allImages 원본 백업용
-          let allImages      = [];       // 전체 이미지 메타데이터 저장
-          let currentBatch   = 0;        // 렌더된 배치 인덱스
-          let isRendering    = false;    // 중복 렌더링 방지 플래그
-          let totalCount     = 0;        // ← 전체 개수 헤더에서 읽어 저장
-          let currentView       = 'id';      // 'id'  | 'category'
-          let viewOwner         = 'self';    // 'self'| 'friend'
-          let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
-          let userData          = {};        // 현재 보여지는 데이터 (내 것 또는 친구 것)
-          
-          const advancedFilters = { groups: [], members: [] };
-          
-          /* 짧은 셀렉터 도우미 */
-          function $(sel,  scope=document) { return scope.querySelector(sel); }
-          function $$(sel, scope=document) { return Array.from(scope.querySelectorAll(sel)); }
-
-          /* ── 공통: 이미지 상세 모달 ───────────────────────── */
-          function showModal(img) {
-            const $modal      = $('#photo-modal');
-            const $modalImg   = $('#modal-image');
-            const $modalInfo  = $('#modal-info');
-
-            $modalImg.src = img.src;
-
-            $modalInfo.innerHTML = `
-              <p>${img.dataset.group   || ''}</p>
-              <p>${img.dataset.member  || ''}</p>
-              <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
-              <p>${img.dataset.version || ''}</p>
-              <p>#${img.dataset.unique}</p>
-            `;
-
-            $modal.style.display = 'block';
+          $exportModalClose.addEventListener('click', () => {
+            $exportModal.style.display = 'none';
+          });
+          $exportModal.addEventListener('click', e => {
+          if (e.target === $exportModal) {
+            $exportModal.style.display = 'none';
           }
-            // 모달 전체에서 우클릭 메뉴 차단
-            $('#photo-modal').addEventListener('contextmenu', e => e.preventDefault());
-
-            // 모달 안 이미지에서도 우클릭 메뉴 차단
-            $('#modal-image').addEventListener('contextmenu', e => e.preventDefault());
-
-
-
-          /* X 버튼 -or- 바깥 클릭 → 모달 닫기 */
-          $('#modal-close').addEventListener('click', () => $('#photo-modal').style.display = 'none');
-          $('#photo-modal').addEventListener('click', e => {
-            if (e.target === $('#photo-modal')) $('#photo-modal').style.display = 'none';
-          });
-
-
+        });
           
-          /* ───────────────────────────────────────────────
-             1. DOMContentLoaded 이후 초기화
-             ─────────────────────────────────────────────── */
-           document.addEventListener('DOMContentLoaded', () => {
-              // ── export-modal 닫기 핸들러 (딱 한 번)
-              const $exportModal      = document.getElementById('export-modal');
-              const $exportModalClose = document.getElementById('export-modal-close');
+          const LONG_PRESS     = 500;
+          const TAP_THRESHOLD  = 200;
+          const MOVE_THRESHOLD = 10;
+
+          // ✅ toggleCheck 함수: 체크 상태 변경
+          function toggleCheck(img) {
+            if (viewOwner !== 'self') return; // 친구 덱에서는 수정 불가
             
-              // × 아이콘 클릭 시
-              $exportModalClose.addEventListener('click', () => {
-                $exportModal.style.display = 'none';
-              });
-              // 모달 바깥(overlay) 클릭 시
-               $exportModal.addEventListener('click', e => {
-                 if (e.target === $exportModal) {
-                   $exportModal.style.display = 'none';
-                 }
-               });  // ← 이 줄을 꼭 추가!
-              
-            const LONG_PRESS     = 500;
-            const TAP_THRESHOLD  = 200;
-            const MOVE_THRESHOLD = 10;
-
-             function toggleCheck(img) {
-               img.classList.toggle('checked');
-               const data = JSON.parse(localStorage.getItem('userData') || '{}');
-               data[img.dataset.unique] = img.classList.contains('checked');
-               localStorage.setItem('userData', JSON.stringify(data));
-               syncLocalDataToServer();
-               updateCount();
-             }
-            // ── ❶ toggleCheck 함수 정의 ...
-             const $grid          = $('#photo-grid');
-             const $viewToggleBtn = $('#view-toggle');
-             const $catToggleBtn  = $('#categoryToggleBtn');
-             const $searchInput   = $('#search-input');
-
-             // 0. 렌더링 후에 값을 채울 변수들은 let 으로
-             let originalCards = [];
-             let photoCards    = [];
-          
-           async function fetchAndRenderImages() {
-               // 1) 전체 이미지 메타데이터 + 전체 개수 가져오기
-              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
-              allImages     = await resp.json();
-              backupAllImages = allImages.slice();   // ← 원본 백업
-              totalCount    = allImages.length;
-              // 2) 첫 배치 렌더링 전 초기화
-              currentBatch = 0;
-              $grid.innerHTML = '';
-              // 3) 첫 번째 배치(100장) 렌더링 호출
-              renderNextBatch();
-           }
-          
-           $searchInput.addEventListener('input', e => {
-             const q = e.target.value.trim().toLowerCase();
-             // empty 시 원본 복구, 아니면 필터링
-             if (!q) {
-               allImages = backupAllImages.slice();
-             } else {
-               allImages = backupAllImages.filter(meta =>
-                 (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
-                   .toLowerCase().includes(q)
-               );
-             }
-             // 페이징 초기화 후 다시 렌더
-             currentBatch = 0;
-             $grid.innerHTML = '';
-             renderNextBatch();
-          });
-
-          $viewToggleBtn.addEventListener('click', () => {
-            if (viewOwner === 'friend') loadSelfDeck();
-            else if (currentFriendUUID) loadFriendDeck(currentFriendUUID);
-            else alert('먼저 친구를 추가하세요!');
-          });
-
-
-          // 이제야 한 번만 이미지를 불러옵니다.
-          fetchAndRenderImages()
-            .catch(console.error);
-   
-
-                    
-            /* ─────────────────────────────────────────────
-               2. 공통 유틸
-               ───────────────────────────────────────────── */
-            /** 현재 화면의 총 카드수 / 보유카드수 표시 */
-            function updateCount () {
-              // “보유됨”은 로컬 userData 에 true인 것의 개수
-              const data = JSON.parse(localStorage.getItem('userData') || '{}');
-              const have = Object.values(data).filter(v => v).length;
-              // “전체”는 헤더에서 읽은 totalCount
-              document.getElementById('count-display').textContent = `${have} / ${totalCount}`;
-            }
-          
-            /** 카드 리스트를 그리드에 그대로 렌더링 */
-            function render(cards) {
-              $grid.innerHTML = '';
-              cards.forEach(c => $grid.appendChild(c));
-              updateCount();
-            }
-          
-            /* ─────────────────────────────────────────────
-               3. 뷰 그리기(정렬) 함수
-               ───────────────────────────────────────────── */
-            /** 고유번호(ID) 내림차순 정렬 뷰 */
-            function showById(list = null) {
-              const cards = (list ?? originalCards).slice();   // 복사본
-              cards.sort((a, b) =>
-                $('.photo-card', b).dataset.unique -
-                $('.photo-card', a).dataset.unique
-              );
-              render(cards);
-            }
-          
-            /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
-            function showByCategory () {
-              const query = ($searchInput.value || '').toLowerCase();
-              // originalCards 가 방금 렌더된 컨테이너들을 가리키고 있어야 합니다.
-              /* (1) 필터링 */
-              const filtered = originalCards.filter(div => {
-                const img    = $('.photo-card', div);
-                const alt    = img.alt.toLowerCase();
-                const group  = img.dataset.group.toLowerCase();
-                const member = img.dataset.member.toLowerCase();
-          
-                const textOK   = !query || alt.includes(query);
-                const groupOK  = !advancedFilters.groups.length ||
-                                 advancedFilters.groups.includes(group.toUpperCase());
-                const memberOK = !advancedFilters.members.length ||
-                                 advancedFilters.members.some(v => member.includes(v.toLowerCase()));
-          
-                return textOK && groupOK && memberOK;
-              });
-          
-              /* (2) 그룹핑 ( category | title | version )*/
-              const buckets = {};
-              filtered.forEach(div => {
-                const img  = $('.photo-card', div);
-                const key  = [
-                  img.dataset.category || '미분류',
-                  img.dataset.title    || '',
-                  img.dataset.version  || ''
-                ].filter(Boolean).join(' | ');
-                (buckets[key] = buckets[key] || []).push(div);
-              });
-          
-              /* (3) 헤더 + 카드 렌더링 */
-              $grid.innerHTML = '';
-              Object.entries(buckets)
-                .sort(([,a],[,b]) =>
-                  +$('.photo-card', b[0]).dataset.unique -
-                  +$('.photo-card', a[0]).dataset.unique
-                )
-                .forEach(([header, cards]) => {
-                  const h2 = document.createElement('h2');
-                  h2.textContent   = header;
-                  h2.style.margin  = '16px 0 8px';
-                  $grid.appendChild(h2);
-          
-                  cards.sort((a, b) =>
-                    +$('.photo-card', b).dataset.unique -
-                    +$('.photo-card', a).dataset.unique
-                  ).forEach(div => $grid.appendChild(div));
-                });
-          
-              updateCount();
-            }
-          
-            /** 현재 필터/뷰 상태로 다시 그리기 */
-            function applyFilters () {
-                /* ② 공통 필터(검색어 + 상세조건) 한 번만 계산 */
-              const query = ($searchInput.value || '').toLowerCase();
-
-              const filtered = originalCards.filter(div => {
-                const img    = $('.photo-card', div);
-                const alt    = img.alt.toLowerCase();
-                const group  = img.dataset.group.toLowerCase();
-                const member = img.dataset.member.toLowerCase();
-
-                const textOK   = !query || alt.includes(query);
-                const groupOK  = !advancedFilters.groups.length ||
-                                advancedFilters.groups.includes(group.toUpperCase());
-                const memberOK = !advancedFilters.members.length ||
-                                advancedFilters.members.some(v => member.includes(v.toLowerCase()));
-
-                return textOK && groupOK && memberOK;
-              });
-              if (currentView === 'category') showByCategory(filtered);
-              else                            showById(filtered);
-            }
-
-             // ✅ 덱 전환 기능 수정
-          /** 내 보유 카드 표시 */
-          function loadSelfDeck() {
+            img.classList.toggle('checked');
+            // 내 데이터만 로컬 저장소에 저장
             const myData = JSON.parse(localStorage.getItem('userData') || '{}');
-            userData = myData;
+            myData[img.dataset.unique] = img.classList.contains('checked');
+            localStorage.setItem('userData', JSON.stringify(myData));
             
-            photoCards.forEach(img => {
-              img.classList.toggle('checked', !!myData[img.dataset.unique]);
-              img.style.pointerEvents = ''; // 더블클릭 허용
-            });
-          
-            viewOwner = 'self';
-            $viewToggleBtn.textContent = '👥 친구보기';
+            // 현재 보여지는 데이터도 업데이트
+            userData[img.dataset.unique] = img.classList.contains('checked');
+            
+            syncLocalDataToServer();
             updateCount();
           }
+
+          const $grid          = $('#photo-grid');
+          const $viewToggleBtn = $('#view-toggle');
+          const $catToggleBtn  = $('#categoryToggleBtn');
+          const $searchInput   = $('#search-input');
+
+          // 렌더링 후에 값을 채울 변수들
+          let originalCards = [];
+          let photoCards    = [];
+
+        async function fetchAndRenderImages() {
+            const resp = await fetch('https://pocali-backend.onrender.com/api/images');
+            allImages     = await resp.json();
+            backupAllImages = allImages.slice();
+            totalCount    = allImages.length;
+            currentBatch = 0;
+            $grid.innerHTML = '';
+            renderNextBatch();
+        }
+
+        $searchInput.addEventListener('input', e => {
+          const q = e.target.value.trim().toLowerCase();
+          if (!q) {
+            allImages = backupAllImages.slice();
+          } else {
+            allImages = backupAllImages.filter(meta =>
+              (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
+                .toLowerCase().includes(q)
+            );
+          }
+          currentBatch = 0;
+          $grid.innerHTML = '';
+          renderNextBatch();
+        });
+
+        // ✅ 덱 전환 기능 수정
+        /** 내 보유 카드 표시 */
+        function loadSelfDeck() {
+          const myData = JSON.parse(localStorage.getItem('userData') || '{}');
+          userData = myData;
           
-          /** 친구 보유 카드 표시 */
-          async function loadFriendDeck(uuid) {
-            try {
-              const res = await fetch(`https://pocali-backend.onrender.com/api/friend/${uuid}/collection`);
-              if (!res.ok) {
-                alert('친구 데이터를 불러올 수 없습니다.');
-                return false;
-              }
-          
-              const friendData = (await res.json()).data || {};
-              userData = friendData; // 현재 보여지는 데이터를 친구 데이터로 설정
-              
-              photoCards.forEach(img => {
-                img.classList.toggle('checked', !!friendData[img.dataset.unique]);
-                img.style.pointerEvents = 'none'; // 수정 금지
-              });
-          
-              viewOwner = 'friend';
-              currentFriendUUID = uuid;
-              localStorage.setItem('lastFriendUUID', uuid);
-              $viewToggleBtn.textContent = '👤 내 카드보기';
-              updateCount();
-              return true;
-            } catch (error) {
-              console.error('친구 덱 로드 실패:', error);
-              alert('친구 데이터 로드 중 오류가 발생했습니다.');
+          photoCards.forEach(img => {
+            img.classList.toggle('checked', !!myData[img.dataset.unique]);
+            img.style.pointerEvents = ''; // 더블클릭 허용
+          });
+
+          viewOwner = 'self';
+          $viewToggleBtn.textContent = '👥 친구보기';
+          updateCount();
+        }
+
+        /** 친구 보유 카드 표시 */
+        async function loadFriendDeck(uuid) {
+          try {
+            const res = await fetch(`https://pocali-backend.onrender.com/api/friend/${uuid}/collection`);
+            if (!res.ok) {
+              alert('친구 데이터를 불러올 수 없습니다.');
               return false;
             }
-          }
 
-          // ✅ 뷰 토글 버튼 이벤트 (중복 제거)
-          $viewToggleBtn.addEventListener('click', async () => {
-            if (viewOwner === 'friend') {
-              loadSelfDeck();
+            const friendData = (await res.json()).data || {};
+            userData = friendData; // 현재 보여지는 데이터를 친구 데이터로 설정
+            
+            photoCards.forEach(img => {
+              img.classList.toggle('checked', !!friendData[img.dataset.unique]);
+              img.style.pointerEvents = 'none'; // 수정 금지
+            });
+
+            viewOwner = 'friend';
+            currentFriendUUID = uuid;
+            localStorage.setItem('lastFriendUUID', uuid);
+            $viewToggleBtn.textContent = '👤 내 카드보기';
+            updateCount();
+            return true;
+          } catch (error) {
+            console.error('친구 덱 로드 실패:', error);
+            alert('친구 데이터 로드 중 오류가 발생했습니다.');
+            return false;
+          }
+        }
+
+        // ✅ 뷰 토글 버튼 이벤트 (중복 제거) - 단 한 번만 등록
+        $viewToggleBtn.addEventListener('click', async () => {
+          if (viewOwner === 'friend') {
+            loadSelfDeck();
+          } else {
+            if (currentFriendUUID) {
+              await loadFriendDeck(currentFriendUUID);
             } else {
-              if (currentFriendUUID) {
-                await loadFriendDeck(currentFriendUUID);
-              } else {
-                alert('먼저 친구를 추가하세요!');
-              }
+              alert('먼저 친구를 추가하세요!');
             }
+          }
+        });
+
+        // 초기 로드
+        fetchAndRenderImages()
+          .then(() => {
+            // 초기화가 완료된 후 내 덱 로드
+            setTimeout(() => {
+              loadSelfDeck();
+            }, 100);
+          })
+          .catch(console.error);
+
+        /* ─────────────────────────────────────────────
+          2. 공통 유틸
+          ───────────────────────────────────────────── */
+        /** 현재 화면의 총 카드수 / 보유카드수 표시 */
+        function updateCount() {
+          // 현재 보여지는 userData를 기준으로 계산
+          const have = Object.values(userData).filter(v => v).length;
+          document.getElementById('count-display').textContent = `${have} / ${totalCount}`;
+        }
+
+        /** 카드 리스트를 그리드에 그대로 렌더링 */
+        function render(cards) {
+          $grid.innerHTML = '';
+          cards.forEach(c => $grid.appendChild(c));
+          updateCount();
+        }
+
+        /* ─────────────────────────────────────────────
+          3. 뷰 그리기(정렬) 함수
+          ───────────────────────────────────────────── */
+        /** 고유번호(ID) 내림차순 정렬 뷰 */
+        function showById(list = null) {
+          const cards = (list ?? originalCards).slice();
+          cards.sort((a, b) =>
+            $('.photo-card', b).dataset.unique -
+            $('.photo-card', a).dataset.unique
+          );
+          render(cards);
+        }
+
+        /** 카테고리별 그룹 + 제목 + 버전 헤더 뷰 */
+        function showByCategory() {
+          const query = ($searchInput.value || '').toLowerCase();
+          
+          const filtered = originalCards.filter(div => {
+            const img = $('.photo-card', div);
+            const alt = img.alt.toLowerCase();
+            const group = img.dataset.group.toLowerCase();
+            const member = img.dataset.member.toLowerCase();
+
+            const textOK = !query || alt.includes(query);
+            const groupOK = !advancedFilters.groups.length ||
+                          advancedFilters.groups.includes(group.toUpperCase());
+            const memberOK = !advancedFilters.members.length ||
+                            advancedFilters.members.some(v => member.includes(v.toLowerCase()));
+
+            return textOK && groupOK && memberOK;
           });
 
-          // 초기 로드
-          fetchAndRenderImages()
-            .then(() => {
-              loadSelfDeck(); // 초기에는 내 덱 로드
-            })
-            .catch(console.error);
+          const buckets = {};
+          filtered.forEach(div => {
+            const img = $('.photo-card', div);
+            const key = [
+              img.dataset.category || '미분류',
+              img.dataset.title || '',
+              img.dataset.version || ''
+            ].filter(Boolean).join(' | ');
+            (buckets[key] = buckets[key] || []).push(div);
+          });
+
+          $grid.innerHTML = '';
+          Object.entries(buckets)
+            .sort(([,a],[,b]) =>
+              +$('.photo-card', b[0]).dataset.unique -
+              +$('.photo-card', a[0]).dataset.unique
+            )
+            .forEach(([header, cards]) => {
+              const h2 = document.createElement('h2');
+              h2.textContent = header;
+              h2.style.margin = '16px 0 8px';
+              $grid.appendChild(h2);
+
+              cards.sort((a, b) =>
+                +$('.photo-card', b).dataset.unique -
+                +$('.photo-card', a).dataset.unique
+              ).forEach(div => $grid.appendChild(div));
+            });
+
+          updateCount();
+        }
+
+        /** 현재 필터/뷰 상태로 다시 그리기 */
+        function applyFilters() {
+          const query = ($searchInput.value || '').toLowerCase();
+
+          const filtered = originalCards.filter(div => {
+            const img = $('.photo-card', div);
+            const alt = img.alt.toLowerCase();
+            const group = img.dataset.group.toLowerCase();
+            const member = img.dataset.member.toLowerCase();
+
+            const textOK = !query || alt.includes(query);
+            const groupOK = !advancedFilters.groups.length ||
+                          advancedFilters.groups.includes(group.toUpperCase());
+            const memberOK = !advancedFilters.members.length ||
+                            advancedFilters.members.some(v => member.includes(v.toLowerCase()));
+
+            return textOK && groupOK && memberOK;
+          });
           
-            /* 5-3. 좌측 하단 카테고리/ID 전환 버튼 */
-            $catToggleBtn.addEventListener('click', () => {
-              currentView = currentView === 'id' ? 'category' : 'id';
-              $catToggleBtn.textContent = currentView === 'id' ? '🏷️' : '🔢';
-              $catToggleBtn.title       = currentView === 'id'
-                                        ? '카테고리별 보기'
-                                        : '고유번호 순 보기';
-              applyFilters();
-            });
+          if (currentView === 'category') showByCategory(filtered);
+          else showById(filtered);
+        }
+
+        /* ─────────────────────────────────────────────
+          4. 서버 동기화 함수들
+          ───────────────────────────────────────────── */
+        // UUID 확보/생성
+        async function ensureMyUUID() {
+          let me = localStorage.getItem('myUUID');
+          if (me) return me;
+          const r = await fetch('https://pocali-backend.onrender.com/api/register', {
+            method: 'POST'
+          });
+          me = (await r.json()).user_id;
+          localStorage.setItem('myUUID', me);
+          return me;
+        }
+
+        // 로컬 데이터를 서버에 동기화
+        async function syncLocalDataToServer() {
+          const me = localStorage.getItem('myUUID');
+          if (!me || viewOwner !== 'self') return;
+          const data = JSON.parse(localStorage.getItem('userData') || '{}');
+          await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data })
+          });
+        }
+
+        // 서버에서 데이터 가져오기 (10초마다 폴링)
+        async function pollServerData() {
+          if (viewOwner !== 'self') return;
           
-            /* 5-4. 상단 검색 입력 */
-            $searchInput.addEventListener('input', applyFilters);
+          const me = localStorage.getItem('myUUID');
+          if (!me) return;
           
-            /* ─────────────────────────────────────────────
-               6. 초기 랜더링
-               ───────────────────────────────────────────── */
-            showById();          // 기본 정렬
-            loadSelfDeck();       // ✅ 보유표시도 함께!
-            updateCount();       // 카운터 초기화
-            /* 🔻 ❹ 서버→클라이언트 10초 폴링 ------------------------*/
-            async function pollServerData () {
-              if (viewOwner !== 'self') return;           // 친구 보기 땐 건너뜀
-            
-              const me = localStorage.getItem('myUUID');
-              if (!me) return;
-            
-              const r = await fetch(`https://pocali-backend.onrender.com/api/user/${me}`);
-              if (!r.ok) return;
-              userData = JSON.parse((await r.json()).data || '{}');
-              localStorage.setItem('userData', JSON.stringify(userData));
-            
-              photoCards.forEach(img =>
-                img.classList.toggle('checked', !!userData[img.dataset.unique]));
-              updateCount();
-            }
-            setInterval(pollServerData, 10_000);
-            /* ------------------------------------------------------*/
-            /* ── 5-A. 우측 FAB & 모달 보조 기능 ─────────────────────────── */
-            const $fab           = $('#fab');
-            const $userModal     = $('#user-modal');
-            const $userModalClose= $('#user-modal-close');
-            
-            const $addFriendBtn  = $('#add-friend');
-            const $friendModal   = $('#friend-modal');
-            const $friendClose   = $('#friend-modal-close');
-            const $friendConfirm = $('#friend-add-confirm');
-
-            const $resetBtn      = $('#reset-checks');
-            const $exportBtn     = $('#export-sheet');     // (시트 모달 열기만)
-
-            const $userDataModal      = $('#user-data-modal');
-            const $userDataModalClose = $('#user-data-modal-close');
-
-            $userDataModalClose.addEventListener('click', () => $userDataModal.style.display = 'none');
-            $userDataModal.addEventListener('click',  e => {      // 바깥 영역 클릭 시에도 닫힘
-              if (e.target === $userDataModal) $userDataModal.style.display = 'none';
-            });
-
-            // 상세 검색 열기/닫기
-            const detailBtn = document.getElementById('search-detail-btn');
-            const detailModal = document.getElementById('detail-search-modal');
-            const detailForm  = document.getElementById('detail-search-form');
-
-            detailBtn.addEventListener('click', () => detailModal.style.display = 'block');
-            detailModal.querySelector('.close').addEventListener('click', () => detailModal.style.display = 'none');
-            detailModal.addEventListener('click', e => { if (e.target === detailModal) detailModal.style.display = 'none'; });
-
-            // 폼 제출 시 필터 적용
-             detailForm.addEventListener('submit', e => {
-               e.preventDefault();
-              const fd      = new FormData(detailForm);
-               const groups  = fd.getAll('group');
-               const members = fd.getAll('member');
-            
-               // ① allImages 전체에서 필터 적용
-               if (!groups.length && !members.length) {
-                 allImages = backupAllImages.slice();
-               } else {
-                 allImages = backupAllImages.filter(meta =>
-                   (groups.length === 0 || groups.includes(meta.group)) &&
-                   (members.length === 0 || members.includes(meta.member))
-                 );
-               }
-            
-               // ② 페이지네이션 초기화 + 첫 배치 렌더
-               currentBatch = 0;
-               $grid.innerHTML = '';
-               renderNextBatch();
-            
-               // ③ 모달 닫기
-               detailModal.style.display = 'none';
-             });
-
-              // ── export-form 요소 가져오기 (이 줄이 빠져 있었습니다)
-              const $exportForm = document.getElementById('export-form');
-
-             // ✅ 올바른 코드: export-form 값을 기준으로 allImages에서 필터
-                $exportForm.addEventListener('submit', e => {
-                e.preventDefault();
-                const fd      = new FormData($exportForm);
-                const group   = fd.get('group');
-                const members = fd.getAll('member');
-
-                const sel = backupAllImages.filter(meta =>
-                  meta.group === group &&
-                  (members.length === 0 || members.includes(meta.member))
-                );
-                if (!sel.length) {
-                  return alert('선택하신 조건에 맞는 카드가 없습니다.');
-                }
-                  // 3) 메타→<img> 요소로 변환 (보유여부 반영)
-               const nodes = sel.map(meta => {
-                const img = document.createElement('img');
-                img.className       = 'photo-card';
-                img.crossOrigin     = 'anonymous';
-                img.src             = meta.url;
-                img.alt             = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
-                img.dataset.unique  = meta.unique_id;
-                img.dataset.group   = meta.group;
-                img.dataset.member  = meta.member;
-                img.dataset.category= meta.category;
-                img.dataset.title   = meta.title;
-                img.dataset.version = meta.version;
-                const ud = JSON.parse(localStorage.getItem('userData')||'{}');
-                if (ud[meta.unique_id]) img.classList.add('checked');
-                return img;
-              });
-
+          const r = await fetch(`https://pocali-backend.onrender.com/api/user/${me}`);
+          if (!r.ok) return;
           
-              // 3) 모달 숨기고 시트 생성
-              $exportModal.style.display = 'none';
-              generateImageSheet(nodes);
-            });
-               
+          const serverData = JSON.parse((await r.json()).data || '{}');
+          userData = serverData;
+          localStorage.setItem('userData', JSON.stringify(serverData));
+          
+          photoCards.forEach(img =>
+            img.classList.toggle('checked', !!serverData[img.dataset.unique]));
+          updateCount();
+        }
+        setInterval(pollServerData, 10_000);
 
-            /* 🔻 ❺ 다른 UUID 불러오기 --------------------------------*/
-            $('#load-other-data')?.addEventListener('click', async () => {
-              const other = $('#other-uuid').value.trim();
-              if (!other) return alert('UUID를 입력하세요!');
-              const r = await fetch(`https://pocali-backend.onrender.com/api/user/${other}`);
-              if (!r.ok) return alert('해당 UUID를 찾을 수 없습니다.');
-              const json = await r.json();
-              localStorage.setItem('userData', json.data);
-              localStorage.setItem('myUUID',   other);
-              location.reload();                 // ← 바로 적용
-            });
-            /* -------------------------------------------------------*/
-            /* 🔻 ❺-B : 유저 데이터 모달 & 서버 동기화 ----------------------- */
-            const $loadUserBtn  = $('#load-user-data');      // ① “유저 데이터 불러오기”
+        /* ─────────────────────────────────────────────
+          5. UI 이벤트 핸들러들
+          ───────────────────────────────────────────── */
+        // 카테고리/ID 전환 버튼
+        $catToggleBtn.addEventListener('click', () => {
+          currentView = currentView === 'id' ? 'category' : 'id';
+          $catToggleBtn.textContent = currentView === 'id' ? '🏷️' : '🔢';
+          $catToggleBtn.title = currentView === 'id'
+                              ? '카테고리별 보기'
+                              : '고유번호 순 보기';
+          applyFilters();
+        });
 
-            // 1) UUID 가 없으면 서버에서 새로 발급받기
-            async function ensureMyUUID () {
-              let me = localStorage.getItem('myUUID');
-              if (me) return me;
-               const r = await fetch('https://pocali-backend.onrender.com/api/register', {
-                 method: 'POST'
-               });
-              me = (await r.json()).user_id;
-              localStorage.setItem('myUUID', me);
-              return me;
-            }
+        // FAB 및 모달들
+        const $fab = $('#fab');
+        const $userModal = $('#user-modal');
+        const $userModalClose = $('#user-modal-close');
+        const $addFriendBtn = $('#add-friend');
+        const $friendModal = $('#friend-modal');
+        const $friendClose = $('#friend-modal-close');
+        const $friendConfirm = $('#friend-add-confirm');
+        const $resetBtn = $('#reset-checks');
+        const $exportBtn = $('#export-sheet');
+        const $userDataModal = $('#user-data-modal');
+        const $userDataModalClose = $('#user-data-modal-close');
 
-            // 2) 로컬 userData → 서버 DB 업로드
-            async function syncLocalDataToServer () {
-              const me = localStorage.getItem('myUUID');
-              if (!me) return;
-              const data = JSON.parse(localStorage.getItem('userData') || '{}');
-              await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
-                method : 'POST',
-                headers: { 'Content-Type':'application/json' },
-                body   : JSON.stringify({ data })
-              });
-            }
+        $userDataModalClose.addEventListener('click', () => $userDataModal.style.display = 'none');
+        $userDataModal.addEventListener('click', e => {
+          if (e.target === $userDataModal) $userDataModal.style.display = 'none';
+        });
 
-            // 3) “유저 데이터 불러오기” 버튼 클릭 시 모달 열기
-            $loadUserBtn?.addEventListener('click', async () => {
-              $userModal.style.display = 'none';          // 기존 모달 닫기
-              const me = await ensureMyUUID();            // UUID 확보/표시
-              $('#my-uuid').value    = me;
-              $('#other-uuid').value = '';
-              $('#uuid-msg').textContent = '';
-              $('#user-data-modal').style.display = 'block';
-            });
-            /* ------------------------------------------------------------- */
+        // 상세 검색 모달
+        const detailBtn = document.getElementById('search-detail-btn');
+        const detailModal = document.getElementById('detail-search-modal');
+        const detailForm = document.getElementById('detail-search-form');
 
+        detailBtn.addEventListener('click', () => detailModal.style.display = 'block');
+        detailModal.querySelector('.close').addEventListener('click', () => detailModal.style.display = 'none');
+        detailModal.addEventListener('click', e => { 
+          if (e.target === detailModal) detailModal.style.display = 'none'; 
+        });
 
-
-
-            /* ① FAB 눌러 → ‘유저 설정’ 모달 */
-            $fab.addEventListener('click', () => $userModal.style.display = 'block');
-            $userModalClose.addEventListener('click', () => $userModal.style.display = 'none');
-            $userModal.addEventListener('click', e => {
-              if (e.target === $userModal) $userModal.style.display = 'none';
-            });
-
-            /* ② 친구 추가 – UUID 입력 모달 */
-            $addFriendBtn.addEventListener('click', () => {
-              $userModal.style.display = 'none';
-              $friendModal.style.display = 'block';
-            });
-            $friendClose.addEventListener('click', () => $friendModal.style.display = 'none');
-            $friendModal.addEventListener('click', e => { if (e.target === $friendModal) $friendModal.style.display = 'none'; });
-
-            $friendConfirm.addEventListener('click', async () => {
-              const me     = localStorage.getItem('myUUID');
-              const friend = $('#friend-uuid').value.trim();
-              if (!me || !friend) { alert('UUID를 입력하세요!'); return; }
-
-              const ok = await fetch('https://pocali-backend.onrender.com/api/friends', {
-                method : 'POST',
-                headers: { 'Content-Type':'application/json' },
-                body   : JSON.stringify({ me, friend })
-              }).then(r => r.ok);
-
-              if (!ok) return alert('등록 실패');
-
-              localStorage.setItem('lastFriendUUID', friend);
-              $friendModal.style.display = 'none';
-              loadFriendDeck(friend);
-              alert('친구 등록 완료!');
-            });
-
-            /* ③ 체크 상태 초기화 */
-            $resetBtn.addEventListener('click', async () => {      // ← async 로 변경
-              if (!confirm('모든 체크를 해제할까요?')) return;
-
-              // 1) 화면-로컬 초기화
-              $$('.photo-card').forEach(img => img.classList.remove('checked'));
-              localStorage.removeItem('userData');
-              updateCount();
-
-              // 2) 서버에도 빈 데이터 업로드  ← ★ 이 두 줄 추가
-              const me = localStorage.getItem('myUUID');
-              if (me) {
-                await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
-                  method : 'POST',
-                  headers: { 'Content-Type':'application/json' },
-                  body   : JSON.stringify({ data: {} })
-                });
-              }
-            });
-
-            /* ④ 시트(프린트) 모달 열기 */
-            $exportBtn.addEventListener('click', () => {
-              $('#user-modal').style.display = 'none';
-              $('#export-modal').style.display = 'block';
-            });
-            
-
-            // ➊ 상세 검색 모달 열기/닫기
-              const searchDetailBtn         = document.getElementById('search-detail-btn');
-              const detailSearchModal       = document.getElementById('detail-search-modal');
-              const detailSearchModalClose  = document.getElementById('detail-search-modal-close');
-
-              searchDetailBtn.addEventListener('click', () => {
-                detailSearchModal.style.display = 'block';
-              });
-              detailSearchModalClose.addEventListener('click', () => {
-                detailSearchModal.style.display = 'none';
-              });
-              detailSearchModal.addEventListener('click', e => {
-                if (e.target === detailSearchModal) detailSearchModal.style.display = 'none';
-              });
-
-              function generateImageSheet(nodes) {
-              // ① 오버레이 생성
-              const overlay = document.createElement('div');
-              overlay.id = 'sheet-overlay';
-              overlay.style.cssText = `
-                position:fixed; inset:0; background:#fff; overflow:auto;
-                z-index:10000; padding:20px; overscroll-behavior:contain;
-              `;
-              document.body.appendChild(overlay);
-
-              // ② 시트 전용 그리드
-              const sheetGrid = document.createElement('div');
-              sheetGrid.id = 'sheet-grid';
-              sheetGrid.style.cssText = `
-                display: grid;
-                grid-template-columns: repeat(20, 100px);
-                grid-auto-rows: auto;
-                gap: 12px;
-                padding: 20px;
-                width: fit-content;
-              `;
-              overlay.appendChild(sheetGrid);
-
-              // ③ 닫기/저장 버튼
-              const btnBar = document.createElement('div');
-              btnBar.style.cssText = 'position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:10001;';
-              
-              const closeBtn = document.createElement('button');
-              closeBtn.textContent = '닫기';
-              closeBtn.onclick = () => overlay.remove();
-              
-              const saveBtn = document.createElement('button');
-              saveBtn.textContent = '저장';
-              saveBtn.onclick = async () => {
-                try {
-                  // 상태 표시
-                  const status = document.createElement('div');
-                  status.textContent = "이미지 생성 중...";
-                  status.style.cssText = 'position:fixed; bottom:20px; left:20px; background:rgba(0,0,0,0.7); color:white; padding:10px; border-radius:5px; z-index:10002;';
-                  overlay.appendChild(status);
-                  
-                  // 모든 이미지가 로드될 때까지 기다림
-                  const images = Array.from(sheetGrid.querySelectorAll('img'));
-                  await Promise.all(images.map(img => {
-                    // 이미 로드된 이미지는 즉시 해결
-                    if (img.complete) return Promise.resolve();
-                    // 아직 로드되지 않은 이미지는 로드 이벤트 기다림
-                    return new Promise(resolve => {
-                      img.onload = resolve;
-                      img.onerror = resolve; // 에러가 나도 진행
-                    });
-                  }));
-                  
-                  console.log('모든 이미지 로드 완료, html2canvas 시작');
-                  status.textContent = "캔버스 생성 중...";
-                  
-                  const canvas = await html2canvas(sheetGrid, {
-                    scale: 2,
-                    backgroundColor: '#fff',
-                    useCORS: true,
-                    allowTaint: true,
-                    logging: true, // 디버깅 정보 출력
-                    onclone: (clonedDoc) => {
-                      // 복제된 DOM의 모든 이미지에 crossOrigin 설정
-                      const clonedImages = clonedDoc.querySelectorAll('img');
-                      clonedImages.forEach(img => {
-                        img.crossOrigin = 'anonymous';
-                        // 불투명도는 그대로 유지
-                      });
-                    }
-                  });
-                  
-                  console.log('캔버스 크기:', canvas.width, '×', canvas.height);
-                  status.textContent = "이미지 다운로드 중...";
-                  
-                  // canvas를 데이터 URL로 변환하여 다운로드
-                  const dataURL = canvas.toDataURL('image/png');
-                  const a = document.createElement('a');
-                  a.href = dataURL;
-                  a.download = `pocalist_sheet_${Date.now()}.png`;
-                  a.click();
-                  
-                  overlay.removeChild(status);
-                } catch (e) {
-                  console.error('캡처 중 오류 발생:', e);
-                  alert('캡처 실패: ' + e.message);
-                }
-              };
-              
-              btnBar.append(closeBtn, saveBtn);
-              overlay.appendChild(btnBar);
-
-              // ④ 노드 복제해서 시트에 추가 (이미지 로딩 처리 개선)
-              nodes.forEach(n => {
-                const container = document.createElement('div');
-                container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center;';
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous'; // CORS 문제 해결을 위해 필수
-                img.className = 'photo-card';
-                img.style.cssText = 'max-width:100%; max-height:140px; object-fit:contain;';
-                
-                // 체크 상태에 따라 불투명도 설정
-                if (n.classList.contains('checked')) {
-                  img.style.opacity = '1'; // 보유 카드는 100% 불투명도
-                } else {
-                  img.style.opacity = '0.4'; // 미보유 카드는 40% 불투명도
-                }
-                
-                // 원본 소스와 데이터셋 복사
-                img.src = n.src;
-                img.alt = n.alt;
-                
-                // 로딩 표시기
-                const loader = document.createElement('div');
-                loader.textContent = '로딩중...';
-                loader.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.8);';
-                container.appendChild(loader);
-                
-                // 이미지 로드 완료 시 로딩 표시기 제거
-                img.onload = () => {
-                  if (loader.parentNode === container) {
-                    container.removeChild(loader);
-                  }
-                };
-                
-                container.appendChild(img);
-                sheetGrid.appendChild(container);
-              });
-            }
-
-              
-            // ─── 페이징별 렌더링 함수 ─────────────────────────
-             function renderNextBatch() {
-            if (isRendering) return;
-            isRendering = true;
-
-            const start = currentBatch * BATCH_SIZE;
-            const end   = start + BATCH_SIZE;
-            const slice = allImages.slice(start, end);
-
-            slice.forEach(image => {
-              // 1) 카드 컨테이너 생성
-              const container = document.createElement('div');
-              container.className = 'photo-card-container';
-
-              // 2) <img> 요소 생성
-              const img = document.createElement('img');
-              img.className       = 'photo-card';
-              img.src             = image.url.startsWith('http')
-                                    ? image.url
-                                    : `https://pocali-backend.onrender.com${image.url}`;
-              img.loading         = 'lazy';
-              img.alt             = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
-              img.dataset.group   = image.group;
-              img.dataset.member  = image.member;
-              img.dataset.category= image.category;
-              img.dataset.title   = image.title;
-              img.dataset.version = image.version;
-              img.dataset.unique  = image.unique_id;
-
-              // ── 로컬 저장소(userData)에 있던 체크 정보 재적용
-              if (viewOwner === 'friend') {
-              // 친구 보기: friendCollection 사용, 수정 금지
-              const own = !!friendCollection[image.unique_id];
-                img.classList.toggle('checked', own);
-                img.style.pointerEvents = 'none';
-                } else {
-              // 내 보기: localStorage userData 사용, 더블클릭 허용
-                const saved = JSON.parse(localStorage.getItem('userData') || '{}');
-                img.classList.toggle('checked', !!saved[image.unique_id]);
-                img.style.pointerEvents = '';
-                          }
-
-
-              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
-              const overlay = document.createElement('div');
-              overlay.className   = 'image-overlay';
-              overlay.textContent = image.type || image.file_type || '';
-              container.appendChild(overlay);
-
-              // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
-              let startTime, pressTimer;
-              img.addEventListener('pointerdown', e => {
-                if (viewOwner !== 'self') return;
-                startTime = performance.now();
-                pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-              });
-              img.addEventListener('pointerup', e => {
-                clearTimeout(pressTimer);
-                if (performance.now() - startTime < TAP_THRESHOLD) {
-                  toggleCheck(img);
-                }
-              });
-              img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
-              img.addEventListener('dblclick', () => {
-                if (viewOwner !== 'self') return;
-                toggleCheck(img);
-              });
-              img.addEventListener('contextmenu', e => {
-                e.preventDefault();
-                showModal(img);
-              });
-
-              // 5) 그리드에 추가
-              container.appendChild(img);
-              $grid.appendChild(container);
-            });
-              // — 캐시 갱신
-            originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
-            photoCards    = Array.from($grid.querySelectorAll('.photo-card'));
-
-            // — 상태 갱신
-            if (currentBatch === 0) {
-              totalCount = allImages.length;
-            }
-            currentBatch++;
-            updateCount();
-
-            // — 현재 뷰(ID/카테고리)에 맞춰 재렌더
-            applyFilters();
-
-            isRendering = false; 
+        detailForm.addEventListener('submit', e => {
+          e.preventDefault();
+          const fd = new FormData(detailForm);
+          const groups = fd.getAll('group');
+          const members = fd.getAll('member');
+          
+          if (!groups.length && !members.length) {
+            allImages = backupAllImages.slice();
+          } else {
+            allImages = backupAllImages.filter(meta =>
+              (groups.length === 0 || groups.includes(meta.group)) &&
+              (members.length === 0 || members.includes(meta.member))
+            );
           }
           
-            // ─── 무한 스크롤 트리거 ─────────────────────────
-            window.addEventListener('scroll', () => {
-              const nearBottom = window.innerHeight + window.scrollY
-                               >= document.body.offsetHeight - 200;
-              if (nearBottom && currentBatch * BATCH_SIZE < allImages.length) {
-                renderNextBatch();
+          currentBatch = 0;
+          $grid.innerHTML = '';
+          renderNextBatch();
+          detailModal.style.display = 'none';
+        });
+
+        // Export form
+        const $exportForm = document.getElementById('export-form');
+        $exportForm.addEventListener('submit', e => {
+          e.preventDefault();
+          const fd = new FormData($exportForm);
+          const group = fd.get('group');
+          const members = fd.getAll('member');
+
+          const sel = backupAllImages.filter(meta =>
+            meta.group === group &&
+            (members.length === 0 || members.includes(meta.member))
+          );
+          
+          if (!sel.length) {
+            return alert('선택하신 조건에 맞는 카드가 없습니다.');
+          }
+          
+          const nodes = sel.map(meta => {
+            const img = document.createElement('img');
+            img.className = 'photo-card';
+            img.crossOrigin = 'anonymous';
+            img.src = meta.url;
+            img.alt = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
+            img.dataset.unique = meta.unique_id;
+            img.dataset.group = meta.group;
+            img.dataset.member = meta.member;
+            img.dataset.category = meta.category;
+            img.dataset.title = meta.title;
+            img.dataset.version = meta.version;
+            
+            // 현재 보여지는 데이터 기준으로 체크 상태 설정
+            if (userData[meta.unique_id]) img.classList.add('checked');
+            return img;
+          });
+          
+          $exportModal.style.display = 'none';
+          generateImageSheet(nodes);
+        });
+
+        // 다른 UUID 불러오기
+        $('#load-other-data')?.addEventListener('click', async () => {
+          const other = $('#other-uuid').value.trim();
+          if (!other) return alert('UUID를 입력하세요!');
+          const r = await fetch(`https://pocali-backend.onrender.com/api/user/${other}`);
+          if (!r.ok) return alert('해당 UUID를 찾을 수 없습니다.');
+          const json = await r.json();
+          localStorage.setItem('userData', json.data);
+          localStorage.setItem('myUUID', other);
+          location.reload();
+        });
+
+        // 유저 데이터 모달
+        const $loadUserBtn = $('#load-user-data');
+        $loadUserBtn?.addEventListener('click', async () => {
+          $userModal.style.display = 'none';
+          const me = await ensureMyUUID();
+          $('#my-uuid').value = me;
+          $('#other-uuid').value = '';
+          $('#uuid-msg').textContent = '';
+          $('#user-data-modal').style.display = 'block';
+        });
+
+        // FAB 모달
+        $fab.addEventListener('click', () => $userModal.style.display = 'block');
+        $userModalClose.addEventListener('click', () => $userModal.style.display = 'none');
+        $userModal.addEventListener('click', e => {
+          if (e.target === $userModal) $userModal.style.display = 'none';
+        });
+
+        // 친구 추가
+        $addFriendBtn.addEventListener('click', () => {
+          $userModal.style.display = 'none';
+          $friendModal.style.display = 'block';
+        });
+        $friendClose.addEventListener('click', () => $friendModal.style.display = 'none');
+        $friendModal.addEventListener('click', e => { 
+          if (e.target === $friendModal) $friendModal.style.display = 'none'; 
+        });
+
+        $friendConfirm.addEventListener('click', async () => {
+          const me = localStorage.getItem('myUUID');
+          const friend = $('#friend-uuid').value.trim();
+          if (!me || !friend) { 
+            alert('UUID를 입력하세요!'); 
+            return; 
+          }
+
+          const ok = await fetch('https://pocali-backend.onrender.com/api/friends', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ me, friend })
+          }).then(r => r.ok);
+
+          if (!ok) return alert('등록 실패');
+
+          localStorage.setItem('lastFriendUUID', friend);
+          $friendModal.style.display = 'none';
+          await loadFriendDeck(friend);
+          alert('친구 등록 완료!');
+        });
+
+        // 체크 상태 초기화
+        $resetBtn.addEventListener('click', async () => {
+          if (!confirm('모든 체크를 해제할까요?')) return;
+
+          // 1) 화면-로컬 초기화
+          $$('.photo-card').forEach(img => img.classList.remove('checked'));
+          userData = {}; // 현재 userData도 초기화
+          localStorage.setItem('userData', JSON.stringify({}));
+          updateCount();
+
+          // 2) 서버에도 빈 데이터 업로드
+          const me = localStorage.getItem('myUUID');
+          if (me) {
+            await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: {} })
+            });
+          }
+        });
+
+        // 시트 모달 열기
+        $exportBtn.addEventListener('click', () => {
+          $('#user-modal').style.display = 'none';
+          $('#export-modal').style.display = 'block';
+        });
+
+        // 시트 생성 함수
+        function generateImageSheet(nodes) {
+          // ① 오버레이 생성
+          const overlay = document.createElement('div');
+          overlay.id = 'sheet-overlay';
+          overlay.style.cssText = `
+            position:fixed; inset:0; background:#fff; overflow:auto;
+            z-index:10000; padding:20px; overscroll-behavior:contain;
+          `;
+          document.body.appendChild(overlay);
+
+          // ② 시트 전용 그리드
+          const sheetGrid = document.createElement('div');
+          sheetGrid.id = 'sheet-grid';
+          sheetGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(20, 100px);
+            grid-auto-rows: auto;
+            gap: 12px;
+            padding: 20px;
+            width: fit-content;
+          `;
+          overlay.appendChild(sheetGrid);
+
+          // ③ 닫기/저장 버튼
+          const btnBar = document.createElement('div');
+          btnBar.style.cssText = 'position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:10001;';
+          
+          const closeBtn = document.createElement('button');
+          closeBtn.textContent = '닫기';
+          closeBtn.onclick = () => overlay.remove();
+          
+          const saveBtn = document.createElement('button');
+          saveBtn.textContent = '저장';
+          saveBtn.onclick = async () => {
+            try {
+              // 상태 표시
+              const status = document.createElement('div');
+              status.textContent = "이미지 생성 중...";
+              status.style.cssText = 'position:fixed; bottom:20px; left:20px; background:rgba(0,0,0,0.7); color:white; padding:10px; border-radius:5px; z-index:10002;';
+              overlay.appendChild(status);
+              
+              // 모든 이미지가 로드될 때까지 기다림
+              const images = Array.from(sheetGrid.querySelectorAll('img'));
+              await Promise.all(images.map(img => {
+                // 이미 로드된 이미지는 즉시 해결
+                if (img.complete) return Promise.resolve();
+                // 아직 로드되지 않은 이미지는 로드 이벤트 기다림
+                return new Promise(resolve => {
+                  img.onload = resolve;
+                  img.onerror = resolve; // 에러가 나도 진행
+                });
+              }));
+              
+              console.log('모든 이미지 로드 완료, html2canvas 시작');
+              status.textContent = "캔버스 생성 중...";
+              
+              const canvas = await html2canvas(sheetGrid, {
+                scale: 2,
+                backgroundColor: '#fff',
+                useCORS: true,
+                allowTaint: true,
+                logging: true, // 디버깅 정보 출력
+                onclone: (clonedDoc) => {
+                  // 복제된 DOM의 모든 이미지에 crossOrigin 설정
+                  const clonedImages = clonedDoc.querySelectorAll('img');
+                  clonedImages.forEach(img => {
+                    img.crossOrigin = 'anonymous';
+                    // 불투명도는 그대로 유지
+                  });
+                }
+              });
+              
+              console.log('캔버스 크기:', canvas.width, '×', canvas.height);
+              status.textContent = "이미지 다운로드 중...";
+              
+              // canvas를 데이터 URL로 변환하여 다운로드
+              const dataURL = canvas.toDataURL('image/png');
+              const a = document.createElement('a');
+              a.href = dataURL;
+              a.download = `pocalist_sheet_${Date.now()}.png`;
+              a.click();
+              
+              overlay.removeChild(status);
+            } catch (e) {
+              console.error('캡처 중 오류 발생:', e);
+              alert('캡처 실패: ' + e.message);
+            }
+          };
+          
+          btnBar.append(closeBtn, saveBtn);
+          overlay.appendChild(btnBar);
+
+          // ④ 노드 복제해서 시트에 추가 (이미지 로딩 처리 개선)
+          nodes.forEach(n => {
+            const container = document.createElement('div');
+            container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center;';
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // CORS 문제 해결을 위해 필수
+            img.className = 'photo-card';
+            img.style.cssText = 'max-width:100%; max-height:140px; object-fit:contain;';
+            
+            // 체크 상태에 따라 불투명도 설정
+            if (n.classList.contains('checked')) {
+              img.style.opacity = '1'; // 보유 카드는 100% 불투명도
+            } else {
+              img.style.opacity = '0.4'; // 미보유 카드는 40% 불투명도
+            }
+            
+            // 원본 소스와 데이터셋 복사
+            img.src = n.src;
+            img.alt = n.alt;
+            
+            // 로딩 표시기
+            const loader = document.createElement('div');
+            loader.textContent = '로딩중...';
+            loader.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.8);';
+            container.appendChild(loader);
+            
+            // 이미지 로드 완료 시 로딩 표시기 제거
+            img.onload = () => {
+              if (loader.parentNode === container) {
+                container.removeChild(loader);
+              }
+            };
+            
+            container.appendChild(img);
+            sheetGrid.appendChild(container);
+          });
+        }
+
+        // ─── 페이징별 렌더링 함수 ─────────────────────────
+        function renderNextBatch() {
+          if (isRendering) return;
+          isRendering = true;
+
+          const start = currentBatch * BATCH_SIZE;
+          const end = start + BATCH_SIZE;
+          const slice = allImages.slice(start, end);
+
+          slice.forEach(image => {
+            // 1) 카드 컨테이너 생성
+            const container = document.createElement('div');
+            container.className = 'photo-card-container';
+
+            // 2) <img> 요소 생성
+            const img = document.createElement('img');
+            img.className = 'photo-card';
+            img.src = image.url.startsWith('http')
+                      ? image.url
+                      : `https://pocali-backend.onrender.com${image.url}`;
+            img.loading = 'lazy';
+            img.alt = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
+            img.dataset.member = image.member;
+            img.dataset.category = image.category;
+            img.dataset.title = image.title;
+            img.dataset.version = image.version;
+            img.dataset.unique = image.unique_id;
+
+            // ── 현재 userData에 따른 체크 정보 적용
+            if (userData[image.unique_id]) {
+              img.classList.add('checked');
+            }
+
+            // 포인터 이벤트 설정
+            img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
+
+            // 3) 오버레이: image.type 또는 백엔드 file_type 활용
+            const overlay = document.createElement('div');
+            overlay.className = 'image-overlay';
+            overlay.textContent = image.type || image.file_type || '';
+            container.appendChild(overlay);
+
+            // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
+            let startTime, pressTimer;
+            img.addEventListener('pointerdown', e => {
+              if (viewOwner !== 'self') return;
+              startTime = performance.now();
+              pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+            });
+            img.addEventListener('pointerup', e => {
+              clearTimeout(pressTimer);
+              if (performance.now() - startTime < TAP_THRESHOLD) {
+                toggleCheck(img);
               }
             });
-             });
-              
+            img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+            img.addEventListener('dblclick', () => {
+              if (viewOwner !== 'self') return;
+              toggleCheck(img);
+            });
+            img.addEventListener('contextmenu', e => {
+              e.preventDefault();
+              showModal(img);
+            });
+
+            // 5) 그리드에 추가
+            container.appendChild(img);
+            $grid.appendChild(container);
+          });
           
+          // — 캐시 갱신
+          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+          photoCards = Array.from($grid.querySelectorAll('.photo-card'));
+
+          // — 상태 갱신
+          if (currentBatch === 0) {
+            totalCount = allImages.length;
+          }
+          currentBatch++;
+          updateCount();
+
+          // — 현재 뷰(ID/카테고리)에 맞춰 재렌더
+          applyFilters();
+
+          isRendering = false; 
+        }
+
+        // ─── 무한 스크롤 트리거 ─────────────────────────
+        window.addEventListener('scroll', () => {
+          const nearBottom = window.innerHeight + window.scrollY
+                          >= document.body.offsetHeight - 200;
+          if (nearBottom && currentBatch * BATCH_SIZE < allImages.length) {
+            renderNextBatch();
+          }
+        });
+
+        });
+    
           </script>
                
       </body>
