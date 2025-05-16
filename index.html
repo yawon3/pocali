@@ -727,6 +727,62 @@
                 if (e.target === detailSearchModal) detailSearchModal.style.display = 'none';
               });
 
+              // ── ㉢ 이미지 시트 생성 함수 (export-form submit 직전에 호출됨)
+              function generateImageSheet(nodes) {
+                // ① 오버레이 생성
+                const overlay = document.createElement('div');
+                overlay.id = 'sheet-overlay';
+                overlay.style.cssText = `
+                  position:fixed; inset:0; background:#fff; overflow:auto;
+                  z-index:10000; padding:20px; overscroll-behavior:contain;
+                `;
+                document.body.appendChild(overlay);
+
+                // ② 시트 전용 그리드
+                const sheetGrid = document.createElement('div');
+                sheetGrid.id = 'sheet-grid';
+                sheetGrid.style.cssText = `
+                  display:grid;
+                  grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+                  gap:12px;
+                `;
+                overlay.appendChild(sheetGrid);
+
+                // ③ 닫기/저장 버튼
+                const btnBar = document.createElement('div');
+                btnBar.style.cssText = 'position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:10001;';
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '닫기';
+                closeBtn.onclick = () => overlay.remove();
+                const saveBtn = document.createElement('button');
+                saveBtn.textContent = '저장';
+                saveBtn.onclick = () => {
+                  html2canvas(sheetGrid, { scale:2, backgroundColor:'#fff', useCORS:true })
+                    .then(canvas => {
+                      const a = document.createElement('a');
+                      a.href = canvas.toDataURL('image/png');
+                      a.download = `pocalist_sheet_${Date.now()}.png`;
+                      a.click();
+                    })
+                    .catch(e => alert('캡처 실패: ' + e.message));
+                };
+                btnBar.append(closeBtn, saveBtn);
+                overlay.appendChild(btnBar);
+
+                // ④ 노드 복제해서 시트에 추가
+                nodes.forEach(n => {
+                  const img = n.cloneNode();
+                  img.style.width = '100%';
+                  img.style.borderRadius = '0';
+                  sheetGrid.appendChild(img);
+                });
+              }
+
+
+
+
+
+
               // ❗️ DOMContentLoaded 내부 export-form submit 핸들러
               $exportForm.addEventListener('submit', e => {
                 e.preventDefault();
