@@ -727,8 +727,7 @@
                 if (e.target === detailSearchModal) detailSearchModal.style.display = 'none';
               });
 
-              // ── ㉢ 이미지 시트 생성 함수 (export-form submit 직전에 호출됨)
-              function generateImageSheet(nodes) {
+                function generateImageSheet(nodes) {
                 // ① 오버레이 생성
                 const overlay = document.createElement('div');
                 overlay.id = 'sheet-overlay';
@@ -742,97 +741,123 @@
                 const sheetGrid = document.createElement('div');
                 sheetGrid.id = 'sheet-grid';
                 sheetGrid.style.cssText = `
-                   display: grid;
-                    /* 한 줄짜리 그리드로, 각 칸 너비 100px */
-                    grid-auto-flow: column;
-                    grid-auto-columns: 100px;
-                    gap: 12px;
-                    /* 넘칠 때 가로 스크롤 */
-                    width: max-content;
+                  display: grid;
+                  grid-template-columns: repeat(auto-fill, 100px);
+                  grid-auto-rows: auto;
+                  gap: 12px;
+                  padding: 20px;
+                  width: fit-content;
+                  min-width: 80%;
                 `;
                 overlay.appendChild(sheetGrid);
 
                 // ③ 닫기/저장 버튼
                 const btnBar = document.createElement('div');
                 btnBar.style.cssText = 'position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:10001;';
+                
                 const closeBtn = document.createElement('button');
                 closeBtn.textContent = '닫기';
                 closeBtn.onclick = () => overlay.remove();
+                
                 const saveBtn = document.createElement('button');
                 saveBtn.textContent = '저장';
-                saveBtn.onclick = () => {
-                  html2canvas(sheetGrid, { scale:2, backgroundColor:'#fff', useCORS:true })
-                    .then(canvas => {
-                      console.log('캔버스 크기:', canvas.width, '×', canvas.height);
-                      const a = document.createElement('a');
-                      a.href = canvas.toDataURL('image/png');
-                      a.download = `pocalist_sheet_${Date.now()}.png`;
-                      a.click();
-                    })
-                    .catch(e => alert('캡처 실패: ' + e.message));
+                saveBtn.onclick = async () => {
+                  try {
+                    // 상태 표시
+                    const status = document.createElement('div');
+                    status.textContent = "이미지 생성 중...";
+                    status.style.cssText = 'position:fixed; bottom:20px; left:20px; background:rgba(0,0,0,0.7); color:white; padding:10px; border-radius:5px;';
+                    overlay.appendChild(status);
+                    
+                    // 모든 이미지가 로드될 때까지 기다림
+                    const images = Array.from(sheetGrid.querySelectorAll('img'));
+                    await Promise.all(images.map(img => {
+                      // 이미 로드된 이미지는 즉시 해결
+                      if (img.complete) return Promise.resolve();
+                      // 아직 로드되지 않은 이미지는 로드 이벤트 기다림
+                      return new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve; // 에러가 나도 진행
+                      });
+                    }));
+                    
+                    console.log('모든 이미지 로드 완료, html2canvas 시작');
+                    status.textContent = "캔버스 생성 중...";
+                    
+                    const canvas = await html2canvas(sheetGrid, {
+                      scale: 2,
+                      backgroundColor: '#fff',
+                      useCORS: true,
+                      allowTaint: true,
+                      logging: true, // 디버깅 정보 출력
+                      onclone: (clonedDoc) => {
+                        // 복제된 DOM의 모든 이미지에 crossOrigin 설정
+                        const clonedImages = clonedDoc.querySelectorAll('img');
+                        clonedImages.forEach(img => {
+                          img.crossOrigin = 'anonymous';
+                        });
+                      }
+                    });
+                    
+                    console.log('캔버스 크기:', canvas.width, '×', canvas.height);
+                    status.textContent = "이미지 다운로드 중...";
+                    
+                    // canvas를 데이터 URL로 변환하여 다운로드
+                    const dataURL = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = dataURL;
+                    a.download = `pocalist_sheet_${Date.now()}.png`;
+                    a.click();
+                    
+                    overlay.removeChild(status);
+                  } catch (e) {
+                    console.error('캡처 중 오류 발생:', e);
+                    alert('캡처 실패: ' + e.message);
+                  }
                 };
+                
                 btnBar.append(closeBtn, saveBtn);
                 overlay.appendChild(btnBar);
 
-                // ④ 노드 복제해서 시트에 추가
+                // ④ 노드 복제해서 시트에 추가 (이미지 로딩 처리 개선)
                 nodes.forEach(n => {
-                const img = n.cloneNode();
-                console.log('복제한 img src:', img.src);
-                sheetGrid.appendChild(img);
-              });
-              }
-
-
-
-
-
-
-              // ❗️ DOMContentLoaded 내부 export-form submit 핸들러
-              $exportForm.addEventListener('submit', e => {
-                e.preventDefault();
-                const fd      = new FormData($exportForm);
-                const group   = fd.get('group');
-                const members = fd.getAll('member');
-                // 백업된 메타데이터에서 필터링
-                const sel = backupAllImages.filter(meta =>
-                  meta.group === group &&
-                  (members.length === 0 || members.includes(meta.member))
-                );
-                
-                // 1) 메타데이터 수준에서 조건 필터
-                const selMetas = backupAllImages.filter(meta =>
-                  meta.group === group &&
-                  (members.length === 0 || members.includes(meta.member))
-                );
-              
-                // 2) 만약 멤버 체크박스에서 아무것도 선택되지 않았다면 모든 그룹/멤버 허용
-                //    (members.length===0 이면 위에서도 이미 모두 통과)
-              
-                // 3) 메타데이터 → 새 <img> 요소로 변환 (검색 중인 화면 상태와 무관)
-                const nodes = selMetas.map(meta => {
-                  const img = document.createElement('img');
-                  img.className       = 'photo-card';
-                  img.src             = meta.url;
-                  img.alt             = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
-                  img.dataset.unique  = meta.unique_id;
-                  img.dataset.group   = meta.group;
-                  img.dataset.member  = meta.member;
-                  img.dataset.category= meta.category;
-                  img.dataset.title   = meta.title;
-                  img.dataset.version = meta.version;
-                  // 로컬체크 반영
-                  const ud = JSON.parse(localStorage.getItem('userData')||'{}');
-                  if (ud[meta.unique_id]) img.classList.add('checked');
-                  return img;
+                  const container = document.createElement('div');
+                  container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center;';
+                  
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous'; // CORS 문제 해결을 위해 필수
+                  img.className = 'photo-card';
+                  img.style.cssText = 'max-width:100%; max-height:140px; object-fit:contain;';
+                  
+                  // 원본 소스와 데이터셋 복사
+                  img.src = n.src;
+                  img.alt = n.alt;
+                  
+                  // 로딩 표시기
+                  const loader = document.createElement('div');
+                  loader.textContent = '로딩중...';
+                  loader.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.8);';
+                  container.appendChild(loader);
+                  
+                  // 이미지 로드 완료 시 로딩 표시기 제거
+                  img.onload = () => {
+                    if (loader.parentNode === container) {
+                      container.removeChild(loader);
+                    }
+                  };
+                  
+                  // 체크 상태 표시 (있는 경우)
+                  if (n.classList.contains('checked')) {
+                    const checkedMark = document.createElement('div');
+                    checkedMark.textContent = '✓';
+                    checkedMark.style.cssText = 'position:absolute; top:5px; right:5px; width:20px; height:20px; background:green; color:white; border-radius:50%; display:flex; justify-content:center; align-items:center; font-weight:bold;';
+                    container.appendChild(checkedMark);
+                  }
+                  
+                  container.appendChild(img);
+                  sheetGrid.appendChild(container);
                 });
-
-
-                // 모달 닫고 시트 생성
-                $exportModal.style.display = 'none';
-                generateImageSheet(nodes);
-              });
-
-
+              }
 
               
             // ─── 페이징별 렌더링 함수 ─────────────────────────
