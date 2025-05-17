@@ -230,6 +230,141 @@
         }
         }
 
+        // UUID 문제 해결을 위한 수정 코드
+        // 다음 코드를 스크립트 초기에 추가하세요 (document.addEventListener 위에)
+
+        // UUID 유효성 검사 함수
+        function isValidUUID(uuid) {
+          if (!uuid) return false;
+          // 기본적인 UUID 형식 검사
+          const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return regex.test(uuid.trim());
+        }
+
+        // 앱 시작 시 UUID 검증 및 복구
+        async function validateUserID() {
+          try {
+            const storedUUID = localStorage.getItem('myUUID');
+            
+            // UUID가 없거나 유효하지 않으면 초기화
+            if (!isValidUUID(storedUUID)) {
+              console.log('유효하지 않은 UUID:', storedUUID);
+              localStorage.removeItem('myUUID');
+              localStorage.removeItem('userData');
+              return await ensureMyUUID();
+            }
+            
+            // UUID는 유효하지만 userData가 없는 경우 서버에서 가져오기
+            const userData = localStorage.getItem('userData');
+            if (!userData || userData === 'undefined' || userData === '{}') {
+              console.log('userData 누락, 서버에서 데이터 가져오기');
+              try {
+                const resp = await fetch(`https://pocali-backend.onrender.com/api/user/${storedUUID}`);
+                if (resp.ok) {
+                  const data = await resp.json();
+                  // 데이터가 문자열인지 확인하고 적절히 저장
+                  if (typeof data.data === 'string') {
+                    localStorage.setItem('userData', data.data);
+                  } else {
+                    localStorage.setItem('userData', JSON.stringify(data.data || {}));
+                  }
+                }
+              } catch (error) {
+                console.error('사용자 데이터 복구 실패:', error);
+              }
+            }
+            
+            return storedUUID;
+          } catch (error) {
+            console.error('UUID 검증 오류:', error);
+            return await ensureMyUUID();
+          }
+        }
+
+        // ensureMyUUID 함수 수정
+        async function ensureMyUUID() {
+          try {
+            let me = localStorage.getItem('myUUID');
+            // UUID가 있고 유효하면 그대로 사용
+            if (isValidUUID(me)) return me;
+            
+            // 없거나 유효하지 않으면 새로 발급
+            console.log('새 UUID 발급 요청');
+            const r = await fetch('https://pocali-backend.onrender.com/api/register', {
+              method: 'POST'
+            });
+            
+            if (!r.ok) {
+              throw new Error('UUID 발급 실패');
+            }
+            
+            const resp = await r.json();
+            me = resp.user_id;
+            
+            if (!isValidUUID(me)) {
+              throw new Error('서버에서 유효하지 않은 UUID 반환');
+            }
+            
+            localStorage.setItem('myUUID', me);
+            localStorage.setItem('userData', JSON.stringify({}));
+            return me;
+          } catch (error) {
+            console.error('UUID 발급 오류:', error);
+            alert('사용자 정보 초기화 중 오류가 발생했습니다. 페이지를 새로고침 해주세요.');
+            return null;
+          }
+        }
+
+        // load-other-data 이벤트 핸들러 수정
+        // 이 코드를 기존 load-other-data 이벤트 핸들러 대신 사용하세요
+        function setupLoadOtherDataHandler() {
+          $('#load-other-data')?.addEventListener('click', async () => {
+            const other = $('#other-uuid').value.trim();
+            if (!isValidUUID(other)) {
+              return alert('유효한 UUID를 입력하세요!');
+            }
+            
+            try {
+              const r = await fetch(`https://pocali-backend.onrender.com/api/user/${other}`);
+              if (!r.ok) {
+                return alert('해당 UUID를 찾을 수 없습니다.');
+              }
+              
+              const json = await r.json();
+              
+              // 데이터 형식 처리 개선
+              if (typeof json.data === 'string') {
+                try {
+                  // 이미 문자열이지만 JSON 형식인지 확인
+                  JSON.parse(json.data);
+                  localStorage.setItem('userData', json.data);
+                } catch {
+                  // JSON 파싱 실패 시 객체로 감싸서 저장
+                  localStorage.setItem('userData', JSON.stringify(json.data || {}));
+                }
+              } else {
+                // 객체인 경우 문자열로 변환하여 저장
+                localStorage.setItem('userData', JSON.stringify(json.data || {}));
+              }
+              
+              localStorage.setItem('myUUID', other);
+              
+              // 로컬 스토리지에 정상 저장되었는지 확인
+              const testUUID = localStorage.getItem('myUUID');
+              const testData = localStorage.getItem('userData');
+              
+              if (testUUID !== other || !testData) {
+                alert('로컬 스토리지 저장에 문제가 있습니다. 페이지를 새로고침 합니다.');
+              }
+              
+              location.reload();
+            } catch (error) {
+              console.error('데이터 로드 오류:', error);
+              alert('데이터 로드 중 오류가 발생했습니다.');
+            }
+          });
+        }
+
         // 🔥 자동 숨김 스크립트
         document.addEventListener('DOMContentLoaded', () => {
         // ⏰ 여기서 시간 변경 (밀리초 단위)
@@ -390,6 +525,31 @@ document.addEventListener('DOMContentLoaded', () => {
   // 렌더링 후에 값을 채울 변수들
   let originalCards = [];
   let photoCards    = [];
+
+  validateUserID().then(uuid => {
+  console.log('검증된 UUID:', uuid);
+  if (uuid) {
+    // UUID가 유효하면 userData 로드
+    const rawUserData = localStorage.getItem('userData');
+    try {
+      if (rawUserData) {
+        userData = JSON.parse(rawUserData);
+      } else {
+        userData = {};
+        localStorage.setItem('userData', JSON.stringify(userData));
+      }
+    } catch (e) {
+      console.error('userData 파싱 오류:', e);
+      userData = {};
+      localStorage.setItem('userData', JSON.stringify(userData));
+    }
+  }
+}).catch(error => {
+  console.error('UUID 검증 실패:', error);
+});
+
+// load-other-data 핸들러 설정 호출
+setupLoadOtherDataHandler();
 
   // ✅ toggleCheck 함수: 체크 상태 변경
   function toggleCheck(img) {
