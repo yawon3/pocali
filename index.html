@@ -174,7 +174,7 @@
         top: 25%; right: 15%; transform: rotate(12deg); z-index: -1;"></div>
 
         <div class="background-card" style="position: absolute; width: 120px; height: 180px; 
-        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747293418/특전/IVE_AN_IE_osaka_4-27_351565.jpg');
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296129/event/IVE_AN_pepsi_winner_289545.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         bottom: 20%; left: 25%; transform: rotate(5deg); z-index: -1;"></div>
@@ -1561,22 +1561,21 @@
           uuidGuideModal.innerHTML = `
             <div class="modal-content" style="max-width: 500px;">
               <span class="close">&times;</span>
-              <h3>중요: UUID 저장 안내</h3>
+              <h3>중요: UUID 유지 안내</h3>
               <p style="margin-bottom: 15px;">사파리, 크롬 등의 iOS/iPadOS 브라우저에서는 앱을 완전히 종료하면 UUID 정보가 초기화될 수 있습니다.</p>
-              <p style="margin-bottom: 15px;">아래 UUID를 <strong>복사하여 저장</strong>하고, 앱 재실행 시 "유저 데이터 불러오기"에서 입력하면 데이터가 유지됩니다.</p>
-              <div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center;">
-                  <input id="current-uuid-display" type="text" readonly style="flex: 1; padding: 8px; font-family: monospace;" />
-                  <button id="copy-uuid-btn" style="margin-left: 10px; padding: 8px;">복사</button>
-                </div>
+              <p style="margin-bottom: 15px;"><strong>홈 화면에 추가</strong>하면 데이터가 유지됩니다:</p>
+              
+              <div style="background: #f5f5f5; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="margin-top: 0; margin-bottom: 10px;">홈 화면에 추가하는 방법:</h4>
+                <ol style="margin: 0; padding-left: 20px;">
+                  <li style="margin-bottom: 8px;">브라우저 하단의 <strong>공유 버튼</strong> <span style="display: inline-block; width: 20px; height: 20px; background: #eee; text-align: center; border-radius: 4px; line-height: 20px; vertical-align: middle;">↑</span>을 누릅니다.</li>
+                  <li style="margin-bottom: 8px;"><strong>"홈 화면에 추가"</strong> 옵션을 선택합니다.</li>
+                  <li>오른쪽 상단의 <strong>"추가"</strong> 버튼을 누릅니다.</li>
+                </ol>
               </div>
-              <p><strong>또는</strong> 아래 링크를 북마크하면 저장된 UUID로 자동 접속됩니다:</p>
-              <div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center;">
-                  <input id="uuid-bookmark-link" type="text" readonly style="flex: 1; padding: 8px; font-family: monospace;" />
-                  <button id="copy-link-btn" style="margin-left: 10px; padding: 8px;">복사</button>
-                </div>
-              </div>
+              
+              <p>현재 UUID: <strong id="current-uuid-display-text" style="font-family: monospace;"></strong></p>
+              
               <label>
                 <input type="checkbox" id="dont-show-again" />
                 다시 보지 않기
@@ -1607,13 +1606,6 @@
               border-radius: 4px;
               cursor: pointer;
             }
-            #copy-uuid-btn, #copy-link-btn {
-              background-color: #4a90e2;
-              color: white;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-            }
           `;
           document.head.appendChild(style);
           document.body.appendChild(uuidGuideModal);
@@ -1624,34 +1616,43 @@
               const uuid = await getMyUUID();
               if (!uuid) return;
               
-              document.getElementById('current-uuid-display').value = uuid;
-              
-              // 북마크 URL 생성
+              // 현재 URL에 UUID 파라미터 추가
               const currentUrl = new URL(window.location.href);
               currentUrl.searchParams.set('uuid', uuid);
-              document.getElementById('uuid-bookmark-link').value = currentUrl.toString();
+              
+              // URL 파라미터를 제외한 기본 URL만 저장하고 uuid만 파라미터로 포함
+              const baseUrl = currentUrl.origin + currentUrl.pathname;
+              const finalUrl = new URL(baseUrl);
+              finalUrl.searchParams.set('uuid', uuid);
+              
+              // 웹 앱 메타데이터 업데이트 (홈 화면 아이콘용)
+              const metaAppTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+              if (!metaAppTitle) {
+                const newMeta = document.createElement('meta');
+                newMeta.name = 'apple-mobile-web-app-title';
+                newMeta.content = 'POCALIST';
+                document.head.appendChild(newMeta);
+              }
+              
+              const metaAppCapable = document.querySelector('meta[name="apple-mobile-web-app-capable"]');
+              if (!metaAppCapable) {
+                const newMeta = document.createElement('meta');
+                newMeta.name = 'apple-mobile-web-app-capable';
+                newMeta.content = 'yes';
+                document.head.appendChild(newMeta);
+              }
+              
+              // UUID 표시
+              document.getElementById('current-uuid-display-text').textContent = uuid;
+              
+              // 현재 페이지의 URL을 UUID가 포함된 URL로 조용히 변경 (새로고침 없이)
+              if (history.replaceState) {
+                history.replaceState(null, null, finalUrl.toString());
+              }
             } catch (error) {
               console.error('UUID 정보 업데이트 실패:', error);
             }
           }
-
-          // UUID 복사 버튼
-          document.getElementById('copy-uuid-btn')?.addEventListener('click', async () => {
-            const uuidInput = document.getElementById('current-uuid-display');
-            uuidInput.select();
-            document.execCommand('copy');
-            
-            alert('UUID가 클립보드에 복사되었습니다!');
-          });
-
-          // 링크 복사 버튼
-          document.getElementById('copy-link-btn')?.addEventListener('click', () => {
-            const linkInput = document.getElementById('uuid-bookmark-link');
-            linkInput.select();
-            document.execCommand('copy');
-            
-            alert('링크가 클립보드에 복사되었습니다!');
-          });
 
           // 닫기 버튼
           document.getElementById('uuid-guide-close')?.addEventListener('click', () => {
@@ -1696,8 +1697,18 @@
                     await saveUserData('myUUID', urlUuid);
                     await saveUserData('userData', JSON.stringify(data.data || {}));
                     
+                    // UUID가 URL 파라미터에서 왔다는 표시 저장
+                    localStorage.setItem('uuidFromUrl', 'true');
+                    setCookie('uuidFromUrl', 'true', 30);
+                    
                     alert('URL의 UUID로 데이터를 불러왔습니다!');
-                    location.reload();
+                    
+                    // URL에서 uuid 파라미터 제거 (홈 화면에 추가 시 항상 같은 uuid로 고정되지 않게)
+                    const cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.delete('uuid');
+                    
+                    // URL 변경 후 새로고침
+                    window.location.href = cleanUrl.toString();
                   }
                 }
               }
@@ -1718,6 +1729,13 @@
               const hideGuide = localStorage.getItem('hideUuidGuide') || getCookie('hideUuidGuide');
               if (hideGuide === 'true') return;
               
+              // URL에서 UUID를 로드했는지 확인 (홈 화면에 추가 시)
+              const uuidFromUrl = localStorage.getItem('uuidFromUrl') || getCookie('uuidFromUrl');
+              if (uuidFromUrl === 'true') {
+                // 이미 홈 화면에 추가된 상태로 예상됨
+                return;
+              }
+              
               // 현재 UUID 확인
               const uuid = await getMyUUID();
               if (!uuid) return;
@@ -1736,8 +1754,18 @@
 
           // 앱 실행 시 URL 파라미터 확인 및 가이드 모달 표시
           window.addEventListener('load', () => {
-            checkUrlParams();
-            showUuidGuideIfNeeded();
+            // 앱이 홈 화면에서 실행되었는지 확인 (standalone 모드)
+            const isInStandaloneMode = window.navigator.standalone === true;
+            
+            if (isInStandaloneMode) {
+              // 홈 화면에서 실행 중인 경우, UUID가 URL에서 왔다고 표시
+              localStorage.setItem('uuidFromUrl', 'true');
+              setCookie('uuidFromUrl', 'true', 30);
+            } else {
+              // 일반 브라우저에서 실행 중인 경우
+              checkUrlParams();
+              showUuidGuideIfNeeded();
+            }
           });
 
           // '유저 데이터 불러오기' 버튼에 부가 안내 추가
@@ -1747,7 +1775,11 @@
               // iOS 플랫폼에서 특별 안내 추가
               const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
               if (isIOS) {
-                alert('아이폰/아이패드에서는 브라우저 종료 시 UUID가 초기화될 수 있습니다. UUID를 복사하여 별도로 저장해두세요.');
+                // 현재 URL 업데이트
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('uuid', me);
+                
+                alert('아이폰/아이패드에서는 브라우저 종료 시 UUID가 초기화될 수 있습니다. 홈 화면에 추가하여 사용하시면 데이터가 유지됩니다.');
               }
             }
           });
