@@ -1562,35 +1562,36 @@
           uuidGuideModal.className = 'modal';
           uuidGuideModal.id = 'uuid-guide-modal';
           uuidGuideModal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-              <span class="close">&times;</span>
-              <h3>중요: 데이터 보존 안내</h3>
-              <p style="margin-bottom: 15px; font-weight: bold; color: #e74c3c;">iOS/iPadOS에서는 브라우저를 종료하면 데이터가 초기화될 수 있습니다.</p>
-              <p style="margin-bottom: 15px;">아래 링크를 <strong>북마크</strong>하거나 <strong>홈 화면에 추가</strong>하여 언제든 같은 UUID로 접속하세요:</p>
-              
-              <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center;">
-                  <input id="uuid-bookmark-link" type="text" readonly style="flex: 1; padding: 8px; font-family: monospace;" />
-                  <button id="copy-link-btn" style="margin-left: 10px; padding: 8px;">복사</button>
+            // 해당 부분만 변경
+              <div class="modal-content" style="max-width: 500px;">
+                <span class="close">&times;</span>
+                <h3>중요: 데이터 보존 안내</h3>
+                <p style="margin-bottom: 15px; font-weight: bold; color: #e74c3c;">iOS/iPadOS에서는 브라우저를 종료하면 데이터가 초기화될 수 있습니다.</p>
+                <p style="margin-bottom: 15px;">아래 링크를 <strong>북마크</strong>하거나 <strong>홈 화면에 추가</strong>하여 언제든 같은 UUID로 접속하세요:</p>
+                
+                <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                  <div style="display: flex; align-items: center;">
+                    <input id="uuid-bookmark-link" type="text" readonly style="flex: 1; padding: 8px; font-family: monospace;" />
+                    <button id="copy-link-btn" style="margin-left: 10px; padding: 8px;">복사</button>
+                  </div>
                 </div>
+                
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                  <p><strong>홈 화면에 추가 또는 북마크에 추가:</strong></p>
+                  <ol style="margin: 0 0 10px 20px;">
+                    <li style="margin-bottom: 8px;"><strong>복사한링크의 주소로 재접속한 후</strong></li>
+                    <li style="margin-bottom: 8px;">브라우저 <strong>상단</strong> 또는 <strong>하단</strong>의 <strong>공유 버튼</strong> <span style="display: inline-block; width: 20px; height: 20px; background: #eee; text-align: center; border-radius: 4px; line-height: 20px; vertical-align: middle;">↑</span>을 누릅니다.</li>
+                    <li style="margin-bottom: 8px;"><strong>"홈 화면에 추가"</strong> 또는 <strong>"북마크"</strong> 옵션을 선택해주세요.</li>
+                  </ol>
+                </div>
+                
+                <label>
+                  <input type="checkbox" id="dont-show-again" />
+                  다시 보지 않기
+                </label>
+                <button id="uuid-guide-close" style="display: block; margin: 15px auto 0; padding: 8px 15px;">확인</button>
               </div>
-              
-              <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <p><strong>홈 화면에 추가 또는 북마크에 추가:</strong></p>
-                <ol style="margin: 0 0 10px 20px;">
-                  <li style="margin-bottom: 8px;"><strong>복사한 링크의 주소로 재접속한 후</strong></li>
-                  <li style="margin-bottom: 8px;">브라우저 <strong>상단</strong> 또는 <strong>하단</strong>의 <strong>공유 버튼</strong> <span style="display: inline-block; width: 20px; height: 20px; background: #eee; text-align: center; border-radius: 4px; line-height: 20px; vertical-align: middle;">↑</span>을 누릅니다.</li>
-                  <li style="margin-bottom: 8px;"><strong>"홈 화면에 추가"</strong> 또는 <strong>"북마크"</strong> 옵션을 선택해주세요.</li>
-                </ol>
-              </div>
-              
-              <label>
-                <input type="checkbox" id="dont-show-again" />
-                다시 보지 않기
-              </label>
-              <button id="uuid-guide-close" style="display: block; margin: 15px auto 0; padding: 8px 15px;">확인</button>
-            </div>
-          `;
+            `;
 
           // 모달 스타일
           const style = document.createElement('style');
