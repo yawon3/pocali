@@ -184,7 +184,7 @@
 
         // 🔥 자동 숨김 스크립트
         document.addEventListener('DOMContentLoaded', () => {
-        // 3초 후 자동으로 로딩 화면 숨기기
+        // 8초 후 자동으로 로딩 화면 숨기기
         setTimeout(() => {
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
@@ -192,7 +192,7 @@
         loadingScreen.style.transition = 'opacity 0.5s';
         setTimeout(() => loadingScreen.remove(), 500);
         }
-        }, 7000);
+        }, 8000);
 
         // 첫 이미지 로드 감지 후 숨기기
         let firstImageLoaded = false;
@@ -641,15 +641,17 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       img.addEventListener('pointerup', e => {
         clearTimeout(pressTimer);
-        if (performance.now() - startTime < TAP_THRESHOLD) {
-          toggleCheck(img);
-        }
+        //if (performance.now() - startTime < TAP_THRESHOLD) {
+        //  toggleCheck(img);
+       // }
       });
       img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
       img.addEventListener('dblclick', () => {
         if (viewOwner !== 'self') return;
         toggleCheck(img);
       });
+      
       img.addEventListener('contextmenu', e => {
         e.preventDefault();
         showModal(img);
