@@ -457,7 +457,7 @@ let isRendering    = false;    // 중복 렌더링 방지 플래그
 let totalCount     = 0;        // ← 전체 개수 헤더에서 읽어 저장
 let currentView       = 'id';      // 'id'  | 'category'
 let viewOwner         = 'self';    // 'self'| 'friend'
-let currentFriendUUID = localStorage.getItem('lastFriendUUID') || null;
+let currentFriendUUID = getLastFriendUUID() || null;
 let userData          = {};        // 현재 보여지는 데이터 (내 것 또는 친구 것)
 
 const advancedFilters = { groups: [], members: [] };
@@ -503,6 +503,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── export-modal 닫기 핸들러
   const $exportModal      = document.getElementById('export-modal');
   const $exportModalClose = document.getElementById('export-modal-close');
+
+  // DOMContentLoaded 이벤트 핸들러 안에 다음 코드 추가
+  currentFriendUUID = getLastFriendUUID() || null;
+  console.log('복구된 친구 UUID:', currentFriendUUID);
   
   $exportModalClose.addEventListener('click', () => {
     $exportModal.style.display = 'none';
@@ -521,6 +525,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const $viewToggleBtn = $('#view-toggle');
   const $catToggleBtn  = $('#categoryToggleBtn');
   const $searchInput   = $('#search-input');
+
+
 
   // 렌더링 후에 값을 채울 변수들
   let originalCards = [];
@@ -1275,6 +1281,241 @@ setupLoadOtherDataHandler();
     .catch(console.error);
 
 });
+
+// 다음 코드를 추가해주세요. script 태그 아래 부분에 넣으면 됩니다.
+
+// 쿠키 유틸리티 함수들
+function setCookie(name, value, days) {
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    expires = "; expires=" + date.toUTCString();
+  }
+  document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Strict";
+}
+
+function getCookie(name) {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for(let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+// UUID와 userData를 localStorage와 쿠키 둘 다에 저장하는 함수
+function saveUserDataBoth(uuid, userData) {
+  try {
+    // localStorage에 저장
+    localStorage.setItem('myUUID', uuid);
+    localStorage.setItem('userData', typeof userData === 'string' ? userData : JSON.stringify(userData));
+    
+    // 쿠키에도 저장 (30일 유효기간)
+    setCookie('myUUID', uuid, 30);
+    setCookie('userData', typeof userData === 'string' ? userData : JSON.stringify(userData), 30);
+    
+    console.log('데이터 저장 완료 (localStorage + 쿠키)');
+    return true;
+  } catch (e) {
+    console.error('데이터 저장 실패:', e);
+    return false;
+  }
+}
+
+// localStorage와 쿠키에서 UUID를 가져오는 함수
+function getPersistedUUID() {
+  // 먼저 localStorage 확인
+  let uuid = localStorage.getItem('myUUID');
+  
+  // localStorage에 없으면 쿠키 확인
+  if (!isValidUUID(uuid)) {
+    uuid = getCookie('myUUID');
+    console.log('쿠키에서 UUID 복구:', uuid);
+    
+    // 쿠키에서 가져온 UUID가 유효하면 localStorage에 다시 저장
+    if (isValidUUID(uuid)) {
+      localStorage.setItem('myUUID', uuid);
+    }
+  }
+  
+  return uuid;
+}
+
+// 수정된 validateUserID 함수
+async function validateUserID() {
+  try {
+    // localStorage와 쿠키 모두에서 UUID 확인
+    const storedUUID = getPersistedUUID();
+    
+    // UUID가 없거나 유효하지 않으면 초기화
+    if (!isValidUUID(storedUUID)) {
+      console.log('유효하지 않은 UUID:', storedUUID);
+      localStorage.removeItem('myUUID');
+      localStorage.removeItem('userData');
+      return await ensureMyUUID();
+    }
+    
+    // localStorage에서 userData 가져오기
+    let userData = localStorage.getItem('userData');
+    
+    // localStorage에 userData가 없으면 쿠키에서 확인
+    if (!userData || userData === 'undefined' || userData === '{}') {
+      userData = getCookie('userData');
+      console.log('쿠키에서 userData 복구 시도');
+      
+      // 쿠키에서 가져온 userData가 유효하면 localStorage에 저장
+      if (userData && userData !== 'undefined' && userData !== '{}') {
+        localStorage.setItem('userData', userData);
+      }
+    }
+    
+    // 여전히 userData가 없으면 서버에서 가져오기
+    if (!userData || userData === 'undefined' || userData === '{}') {
+      console.log('userData 누락, 서버에서 데이터 가져오기');
+      try {
+        const resp = await fetch(`https://pocali-backend.onrender.com/api/user/${storedUUID}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          // 데이터가 문자열인지 확인하고 적절히 저장
+          if (typeof data.data === 'string') {
+            saveUserDataBoth(storedUUID, data.data);
+          } else {
+            saveUserDataBoth(storedUUID, JSON.stringify(data.data || {}));
+          }
+        }
+      } catch (error) {
+        console.error('사용자 데이터 복구 실패:', error);
+      }
+    }
+    
+    return storedUUID;
+  } catch (error) {
+    console.error('UUID 검증 오류:', error);
+    return await ensureMyUUID();
+  }
+}
+
+// 수정된 ensureMyUUID 함수
+async function ensureMyUUID() {
+  try {
+    let me = getPersistedUUID();
+    // UUID가 있고 유효하면 그대로 사용
+    if (isValidUUID(me)) return me;
+    
+    // 없거나 유효하지 않으면 새로 발급
+    console.log('새 UUID 발급 요청');
+    const r = await fetch('https://pocali-backend.onrender.com/api/register', {
+      method: 'POST'
+    });
+    
+    if (!r.ok) {
+      throw new Error('UUID 발급 실패');
+    }
+    
+    const resp = await r.json();
+    me = resp.user_id;
+    
+    if (!isValidUUID(me)) {
+      throw new Error('서버에서 유효하지 않은 UUID 반환');
+    }
+    
+    // localStorage와 쿠키 모두에 저장
+    saveUserDataBoth(me, {});
+    return me;
+  } catch (error) {
+    console.error('UUID 발급 오류:', error);
+    alert('사용자 정보 초기화 중 오류가 발생했습니다. 페이지를 새로고침 해주세요.');
+    return null;
+  }
+}
+
+// load-other-data 이벤트 핸들러 수정
+function setupLoadOtherDataHandler() {
+  $('#load-other-data')?.addEventListener('click', async () => {
+    const other = $('#other-uuid').value.trim();
+    if (!isValidUUID(other)) {
+      return alert('유효한 UUID를 입력하세요!');
+    }
+    
+    try {
+      const r = await fetch(`https://pocali-backend.onrender.com/api/user/${other}`);
+      if (!r.ok) {
+        return alert('해당 UUID를 찾을 수 없습니다.');
+      }
+      
+      const json = await r.json();
+      let userDataStr;
+      
+      // 데이터 형식 처리 개선
+      if (typeof json.data === 'string') {
+        try {
+          // 이미 문자열이지만 JSON 형식인지 확인
+          JSON.parse(json.data);
+          userDataStr = json.data;
+        } catch {
+          // JSON 파싱 실패 시 객체로 감싸서 저장
+          userDataStr = JSON.stringify(json.data || {});
+        }
+      } else {
+        // 객체인 경우 문자열로 변환하여 저장
+        userDataStr = JSON.stringify(json.data || {});
+      }
+      
+      // localStorage와 쿠키 모두에 저장
+      saveUserDataBoth(other, userDataStr);
+      
+      // 로컬 스토리지와 쿠키에 정상 저장되었는지 확인
+      const testUUID = getPersistedUUID();
+      
+      if (testUUID !== other) {
+        alert('데이터 저장에 문제가 있습니다. 페이지를 새로고침 합니다.');
+      }
+      
+      location.reload();
+    } catch (error) {
+      console.error('데이터 로드 오류:', error);
+      alert('데이터 로드 중 오류가 발생했습니다.');
+    }
+  });
+}
+
+// syncLocalDataToServer 함수 수정 (쿠키도 함께 업데이트)
+async function syncLocalDataToServer() {
+  const me = getPersistedUUID();
+  if (!me || viewOwner !== 'self') return;
+  
+  const data = JSON.parse(localStorage.getItem('userData') || '{}');
+  
+  // 쿠키도 함께 업데이트
+  setCookie('userData', JSON.stringify(data), 30);
+  
+  await fetch(`https://pocali-backend.onrender.com/api/user/${me}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data })
+  });
+}
+
+// 친구 저장 기능 개선
+function saveFriendUUID(uuid) {
+  localStorage.setItem('lastFriendUUID', uuid);
+  setCookie('lastFriendUUID', uuid, 30);
+}
+
+// 친구 UUID 불러오기 함수 개선
+function getLastFriendUUID() {
+  let uuid = localStorage.getItem('lastFriendUUID');
+  if (!uuid) {
+    uuid = getCookie('lastFriendUUID');
+    if (uuid) {
+      localStorage.setItem('lastFriendUUID', uuid);
+    }
+  }
+  return uuid;
+}
 
 
 
