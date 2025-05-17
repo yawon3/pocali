@@ -633,25 +633,61 @@ document.addEventListener('DOMContentLoaded', () => {
       container.appendChild(overlay);
 
       // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
-      let startTime, pressTimer;
+      let startX, startY;
+      let moved = false;
+      const MOVE_THRESHOLD = 10; // 10px 이상 움직이면 스크롤로 간주
+
+      
       img.addEventListener('pointerdown', e => {
         if (viewOwner !== 'self') return;
+        
+        // 시작 위치 기록
+        startX = e.clientX;
+        startY = e.clientY;
+        moved = false;
+        
         startTime = performance.now();
         pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
       });
+
+      img.addEventListener('pointermove', e => {
+        if (!startX || !startY) return;
+        
+        // 움직인 거리 계산
+        const deltaX = Math.abs(e.clientX - startX);
+        const deltaY = Math.abs(e.clientY - startY);
+        
+        // 일정 거리 이상 움직였으면 스크롤로 간주
+        if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
+          moved = true;
+          clearTimeout(pressTimer); // 롱프레스 타이머 취소
+        }
+      });
+
       img.addEventListener('pointerup', e => {
         clearTimeout(pressTimer);
-        //if (performance.now() - startTime < TAP_THRESHOLD) {
-        //  toggleCheck(img);
-       // }
+        
+        // 스크롤이 아닌 짧은 탭인 경우에만 토글
+        if (!moved && (performance.now() - startTime < TAP_THRESHOLD)) {
+          toggleCheck(img);
+        }
+        
+        // 변수 초기화
+        startX = startY = null;
+        moved = false;
       });
-      img.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+      img.addEventListener('pointerleave', () => {
+        clearTimeout(pressTimer);
+        startX = startY = null;
+        moved = false;
+      });
 
       img.addEventListener('dblclick', () => {
         if (viewOwner !== 'self') return;
         toggleCheck(img);
       });
-      
+
       img.addEventListener('contextmenu', e => {
         e.preventDefault();
         showModal(img);
