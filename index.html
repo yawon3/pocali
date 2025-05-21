@@ -828,14 +828,49 @@
             updateCount();
           }
 
+          // API에서 이미지 가져오는 부분에 디버깅 추가
           async function fetchAndRenderImages() {
-            const resp = await fetch('https://pocali-backend.onrender.com/api/images');
-            allImages     = await resp.json();
-            backupAllImages = allImages.slice();
-            totalCount    = allImages.length;
-            currentBatch = 0;
-            $grid.innerHTML = '';
-            renderNextBatch();
+            try {
+              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
+              if (!resp.ok) throw new Error('이미지 로드 실패');
+              
+              const data = await resp.json();
+              console.log('API 응답 데이터 예시:', data.slice(0, 2)); // 확인용
+              
+              // 데이터 정제 - 모든 이미지에 필수 필드 있는지 확인
+              allImages = data.map(img => {
+                // 파일 경로에서 그룹/멤버 정보 보강 (필요 시)
+                if (!img.group || !img.member) {
+                  const fileName = img.filename || '';
+                  // IVE_AN_... 패턴에서 IVE는 그룹, AN은 멤버 코드
+                  const parts = fileName.split('_');
+                  if (parts.length >= 2) {
+                    if (!img.group && parts[0] === 'IVE') img.group = 'IVE';
+                    else if (!img.group && parts[0] === 'IZONE') img.group = 'IZONE';
+                    
+                    // 멤버 코드 매핑
+                    const memberCodeMap = {
+                      'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
+                      'LIZ': '리즈', 'LEE': '이서'
+                    };
+                    
+                    if (!img.member && memberCodeMap[parts[1]]) {
+                      img.member = memberCodeMap[parts[1]];
+                    }
+                  }
+                }
+                return img;
+              });
+              
+              backupAllImages = allImages.slice();
+              totalCount = allImages.length;
+              currentBatch = 0;
+              $grid.innerHTML = '';
+              renderNextBatch();
+            } catch (error) {
+              console.error('이미지 로드 오류:', error);
+              alert('이미지를 불러오는 중 오류가 발생했습니다.');
+            }
           }
 
           // ✅ 덱 전환 기능 수정
