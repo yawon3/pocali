@@ -730,25 +730,22 @@
 
         /* ── 공통: 이미지 상세 모달 ───────────────────────── */
         function showModal(img) {
-          const $modal     = $('#photo-modal');
-          const $modalImg  = $('#modal-image');
-          const $modalInfo = $('#modal-info');
+          const $modal      = $('#photo-modal');
+          const $modalImg   = $('#modal-image');
+          const $modalInfo  = $('#modal-info');
 
           $modalImg.src = img.src;
 
-          // 기존에 group만 찍던 부분을 바꿔줍니다.
           $modalInfo.innerHTML = `
-            <p>폴더: ${img.dataset.subfolder || ''}</p>
-            <p>그룹: ${img.dataset.group     || ''}</p>
-            <p>멤버: ${img.dataset.member    || ''}</p>
-            <p>카테고리: ${img.dataset.category || ''} ${img.dataset.title || ''}</p>
-            <p>버전: ${img.dataset.version   || ''}</p>
-            <p>고유ID: #${img.dataset.unique  || ''}</p>
+            <p>${img.dataset.group   || ''}</p>
+            <p>${img.dataset.member  || ''}</p>
+            <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+            <p>${img.dataset.version || ''}</p>
+            <p>#${img.dataset.unique}</p>
           `;
 
           $modal.style.display = 'block';
         }
-
 
         // 앱 초기화 시 실행할 함수
         async function initApp() {
