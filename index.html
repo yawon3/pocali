@@ -828,49 +828,14 @@
             updateCount();
           }
 
-          // API에서 이미지 가져오는 부분에 디버깅 추가
           async function fetchAndRenderImages() {
-            try {
-              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
-              if (!resp.ok) throw new Error('이미지 로드 실패');
-              
-              const data = await resp.json();
-              console.log('API 응답 데이터 예시:', data.slice(0, 2)); // 확인용
-              
-              // 데이터 정제 - 모든 이미지에 필수 필드 있는지 확인
-              allImages = data.map(img => {
-                // 파일 경로에서 그룹/멤버 정보 보강 (필요 시)
-                if (!img.group || !img.member) {
-                  const fileName = img.filename || '';
-                  // IVE_AN_... 패턴에서 IVE는 그룹, AN은 멤버 코드
-                  const parts = fileName.split('_');
-                  if (parts.length >= 2) {
-                    if (!img.group && parts[0] === 'IVE') img.group = 'IVE';
-                    else if (!img.group && parts[0] === 'IZONE') img.group = 'IZONE';
-                    
-                    // 멤버 코드 매핑
-                    const memberCodeMap = {
-                      'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
-                      'LIZ': '리즈', 'LEE': '이서'
-                    };
-                    
-                    if (!img.member && memberCodeMap[parts[1]]) {
-                      img.member = memberCodeMap[parts[1]];
-                    }
-                  }
-                }
-                return img;
-              });
-              
-              backupAllImages = allImages.slice();
-              totalCount = allImages.length;
-              currentBatch = 0;
-              $grid.innerHTML = '';
-              renderNextBatch();
-            } catch (error) {
-              console.error('이미지 로드 오류:', error);
-              alert('이미지를 불러오는 중 오류가 발생했습니다.');
-            }
+            const resp = await fetch('https://pocali-backend.onrender.com/api/images');
+            allImages     = await resp.json();
+            backupAllImages = allImages.slice();
+            totalCount    = allImages.length;
+            currentBatch = 0;
+            $grid.innerHTML = '';
+            renderNextBatch();
           }
 
           // ✅ 덱 전환 기능 수정
@@ -1014,219 +979,129 @@
 
           // ─── 페이징별 렌더링 함수 ─────────────────────────
           function renderNextBatch() {
-          if (isRendering) return;
-          
-          const start = currentBatch * BATCH_SIZE;
-          const end = start + BATCH_SIZE;
-          const slice = allImages.slice(start, end);
-          
-          // 로드할 이미지가 없으면 종료
-          if (slice.length === 0) {
-            isRendering = false;
-            return;
-          }
-          
-          isRendering = true;
-
-          slice.forEach(image => {
-            // 디버깅용 로그
-            console.log('처리 중인 이미지:', image);
+            if (isRendering) return;
             
-            // 1) 카드 컨테이너 생성
-            const container = document.createElement('div');
-            container.className = 'photo-card-container';
-
-            // 2) 오버레이 요소 생성 (이미지 전에 생성)
-            const overlay = document.createElement('div');
-            overlay.className = 'image-overlay';
+            const start = currentBatch * BATCH_SIZE;
+            const end = start + BATCH_SIZE;
+            const slice = allImages.slice(start, end);
             
-            // URL에서 하위 폴더 추출
-            let subFolder = '';
-            if (image.url && image.url.includes('firebasestorage')) {
-              try {
-                // URL에서 경로 부분 추출 (/o/ 다음부터 ? 앞까지)
-                const pathPart = image.url.split('/o/')[1];
-                if (pathPart) {
-                  const encodedPath = pathPart.split('?')[0];
-                  // URL 디코딩 (images%2Fevent%2F -> images/event/)
-                  const decodedPath = decodeURIComponent(encodedPath);
-                  console.log('디코딩된 경로:', decodedPath);
-                  
-                  // 경로 분해 (images/event/파일명.jpg -> ['images', 'event', '파일명.jpg'])
-                  const pathParts = decodedPath.split('/');
-                  
-                  // 두 번째 요소가 하위 폴더 (0=images, 1=event)
-                  if (pathParts.length > 1) {
-                    subFolder = pathParts[1];
-                    console.log('추출된 하위 폴더:', subFolder);
-                  }
+            // 로드할 이미지가 없으면 종료
+            if (slice.length === 0) {
+              isRendering = false;
+              return;
+            }
+            
+            isRendering = true;
+
+            slice.forEach(image => {
+              // 1) 카드 컨테이너 생성
+              const container = document.createElement('div');
+              container.className = 'photo-card-container';
+
+              // 2) <img> 요소 생성
+              const img = document.createElement('img');
+              img.className = 'photo-card';
+              // Firebase Storage URL은 항상 http로 시작하므로 항상 원본 URL 사용
+              img.src = image.url;
+              img.loading = 'lazy';
+              img.alt = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
+              img.dataset.group = image.group;
+              img.dataset.member = image.member;
+              img.dataset.category = image.category;
+              img.dataset.title = image.title;
+              img.dataset.version = image.version;
+              img.dataset.unique = image.unique_id;
+
+              // ── 현재 userData에 따른 체크 정보 적용
+              if (userData[image.unique_id]) {
+                img.classList.add('checked');
+              }
+
+              // 포인터 이벤트 설정
+              img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
+
+              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
+              const overlay = document.createElement('div');
+              overlay.className = 'image-overlay';
+              overlay.textContent = image.type || image.file_type || '';
+              container.appendChild(overlay);
+
+              // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
+              let startX, startY;
+              let moved = false;
+              let startTime, pressTimer;
+              
+              img.addEventListener('pointerdown', e => {
+                if (viewOwner !== 'self') return;
+                
+                // 시작 위치 기록
+                startX = e.clientX;
+                startY = e.clientY;
+                moved = false;
+                
+                startTime = performance.now();
+                pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
+              });
+
+              img.addEventListener('pointermove', e => {
+                if (!startX || !startY) return;
+                
+                // 움직인 거리 계산
+                const deltaX = Math.abs(e.clientX - startX);
+                const deltaY = Math.abs(e.clientY - startY);
+                
+                // 일정 거리 이상 움직였으면 스크롤로 간주
+                if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
+                  moved = true;
+                  clearTimeout(pressTimer); // 롱프레스 타이머 취소
                 }
-              } catch (e) {
-                console.error('경로 추출 중 오류:', e);
-              }
-            }
-            
-            // 오버레이 텍스트 설정
-            overlay.textContent = subFolder || image.file_type || '';
-            container.appendChild(overlay);
+              });
 
-            // 3) <img> 요소 생성
-            const img = document.createElement('img');
-            img.className = 'photo-card';
-            img.src = image.url;
-            img.loading = 'lazy';
-            
-            // 파일명과 메타데이터 추출
-            let fileName = '';
-            let group = '';
-            let member = '';
-            let category = '';
-            let uniqueId = '';
-            
-            // URL에서 파일명 추출
-            if (image.url && image.url.includes('firebasestorage')) {
-              try {
-                const pathPart = image.url.split('/o/')[1];
-                if (pathPart) {
-                  const encodedPath = pathPart.split('?')[0];
-                  const decodedPath = decodeURIComponent(encodedPath);
-                  const pathParts = decodedPath.split('/');
-                  
-                  // 마지막 요소가 파일명
-                  if (pathParts.length > 0) {
-                    fileName = pathParts[pathParts.length - 1];
-                    console.log('추출된 파일명:', fileName);
-                    
-                    // 파일명에서 정보 추출 (IVE_AN_ARENA_351623.jpg 형식)
-                    const nameParts = fileName.split('_');
-                    if (nameParts.length >= 3) {
-                      // 첫 번째 부분이 그룹명
-                      group = nameParts[0];
-                      
-                      // 두 번째 부분이 멤버 코드
-                      const memberMap = {
-                        'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
-                        'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
-                      };
-                      member = memberMap[nameParts[1]] || nameParts[1];
-                      
-                      // 세 번째 부분이 카테고리
-                      category = nameParts[2];
-                      
-                      // 마지막 숫자가 고유 ID
-                      const lastPart = nameParts[nameParts.length - 1];
-                      const idMatch = lastPart.match(/\d+/);
-                      if (idMatch) {
-                        uniqueId = idMatch[0];
-                      }
-                    }
-                  }
+              img.addEventListener('pointerup', e => {
+                clearTimeout(pressTimer);
+                
+                // 스크롤이 아닌 짧은 탭인 경우에만 토글
+                if (!moved && (performance.now() - startTime < TAP_THRESHOLD)) {
+                  toggleCheck(img);
                 }
-              } catch (e) {
-                console.error('파일명 파싱 중 오류:', e);
-              }
-            } else {
-              // 이미 파싱된 데이터가 있으면 사용
-              group = image.group || '';
-              member = image.member || '';
-              category = image.category || '';
-              uniqueId = image.unique_id || '';
-            }
-            
-            // 데이터 설정
-            img.dataset.group = group;
-            img.dataset.member = member;
-            img.dataset.category = category;
-            img.dataset.title = image.title || '';
-            img.dataset.version = image.version || '';
-            img.dataset.unique = uniqueId;
-            
-            // alt 태그 설정
-            img.alt = `${group} ${member} ${category} ${image.title || ''} #${uniqueId}`;
-            
-            // ── 현재 userData에 따른 체크 정보 적용
-            if (userData[uniqueId]) {
-              img.classList.add('checked');
-            }
+                
+                // 변수 초기화
+                startX = startY = null;
+                moved = false;
+              });
 
-            // 포인터 이벤트 설정
-            img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
+              img.addEventListener('pointerleave', () => {
+                clearTimeout(pressTimer);
+                startX = startY = null;
+                moved = false;
+              });
 
-            // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
-            let startX, startY;
-            let moved = false;
-            let startTime, pressTimer;
-            
-            img.addEventListener('pointerdown', e => {
-              if (viewOwner !== 'self') return;
-              
-              // 시작 위치 기록
-              startX = e.clientX;
-              startY = e.clientY;
-              moved = false;
-              
-              startTime = performance.now();
-              pressTimer = setTimeout(() => showModal(img), LONG_PRESS);
-            });
-
-            img.addEventListener('pointermove', e => {
-              if (!startX || !startY) return;
-              
-              // 움직인 거리 계산
-              const deltaX = Math.abs(e.clientX - startX);
-              const deltaY = Math.abs(e.clientY - startY);
-              
-              // 일정 거리 이상 움직였으면 스크롤로 간주
-              if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
-                moved = true;
-                clearTimeout(pressTimer); // 롱프레스 타이머 취소
-              }
-            });
-
-            img.addEventListener('pointerup', e => {
-              clearTimeout(pressTimer);
-              
-              // 스크롤이 아닌 짧은 탭인 경우에만 토글
-              if (!moved && (performance.now() - startTime < TAP_THRESHOLD)) {
+              img.addEventListener('dblclick', () => {
+                if (viewOwner !== 'self') return;
                 toggleCheck(img);
-              }
-              
-              // 변수 초기화
-              startX = startY = null;
-              moved = false;
+              });
+
+              img.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                showModal(img);
+              });
+
+              // 5) 그리드에 추가
+              container.appendChild(img);
+              $grid.appendChild(container);
             });
+            
+            // — 캐시 갱신
+            originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
+            photoCards = Array.from($grid.querySelectorAll('.photo-card'));
 
-            img.addEventListener('pointerleave', () => {
-              clearTimeout(pressTimer);
-              startX = startY = null;
-              moved = false;
-            });
+            // — 상태 갱신
+            currentBatch++;
+            updateCount();
 
-            img.addEventListener('dblclick', () => {
-              if (viewOwner !== 'self') return;
-              toggleCheck(img);
-            });
+            isRendering = false; 
+          }
 
-            img.addEventListener('contextmenu', e => {
-              e.preventDefault();
-              showModal(img);
-            });
-
-            // 5) 그리드에 추가
-            container.appendChild(img);
-            $grid.appendChild(container);
-          });
-          
-          // — 캐시 갱신
-          originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
-          photoCards = Array.from($grid.querySelectorAll('.photo-card'));
-
-          // — 상태 갱신
-          currentBatch++;
-          updateCount();
-
-          isRendering = false;
-        }
           // 서버에서 데이터 가져오기 (10초마다 폴링)
           async function pollServerData() {
             if (viewOwner !== 'self') return;
