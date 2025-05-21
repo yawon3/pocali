@@ -1034,18 +1034,71 @@
               container.className = 'photo-card-container';
 
               // 2) <img> 요소 생성
-              const img = document.createElement('img');
-              img.className = 'photo-card';
-              // Firebase Storage URL은 항상 http로 시작하므로 항상 원본 URL 사용
-              img.src = image.url;
-              img.loading = 'lazy';
-              img.alt = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
-              img.dataset.group = image.group;
-              img.dataset.member = image.member;
-              img.dataset.category = image.category;
-              img.dataset.title = image.title;
-              img.dataset.version = image.version;
-              img.dataset.unique = image.unique_id;
+                const img = document.createElement('img');
+                img.className = 'photo-card';
+                img.src = image.url;
+                img.loading = 'lazy';
+
+                // 파일명에서 정보 추출
+                let fileName = '';
+                if (image.filename) {
+                  fileName = image.filename;
+                } else if (image.url) {
+                  // URL에서 파일명 추출 (경로의 마지막 부분)
+                  const urlParts = image.url.split('/');
+                  const lastPart = urlParts[urlParts.length - 1].split('?')[0]; // ?alt=media 제거
+                  fileName = decodeURIComponent(lastPart);
+                }
+
+                // 그룹 및 멤버 정보 추출 (파일명에서 파싱)
+                const fileNameParts = fileName.split('_');
+                let group = image.group || '';
+                let member = image.member || '';
+                let category = image.category || '';
+                let title = image.title || '';
+                let version = image.version || '';
+                let uniqueId = image.unique_id || '';
+
+                // 파일명 예시: IVE_AN_ARENA_351623.jpg
+                if (fileNameParts.length >= 3) {
+                  // 그룹명 추출
+                  if (!group && fileNameParts[0]) {
+                    if (fileNameParts[0] === 'IVE') group = 'IVE';
+                    else if (fileNameParts[0] === 'IZONE') group = 'IZONE';
+                    else group = fileNameParts[0];
+                  }
+                  
+                  // 멤버 코드 매핑
+                  if (!member && fileNameParts[1]) {
+                    const memberMap = {
+                      'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
+                      'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
+                    };
+                    member = memberMap[fileNameParts[1]] || fileNameParts[1];
+                  }
+                  
+                  // 카테고리/타이틀 추출
+                  if (!category && fileNameParts[2]) {
+                    category = fileNameParts[2];
+                  }
+                  
+                  // 고유 ID 추출 (마지막 숫자)
+                  if (!uniqueId && fileNameParts[fileNameParts.length - 1]) {
+                    const idMatch = fileNameParts[fileNameParts.length - 1].match(/\d+/);
+                    if (idMatch) uniqueId = idMatch[0];
+                  }
+                }
+
+                // 데이터셋에 저장
+                img.dataset.group = group;
+                img.dataset.member = member;
+                img.dataset.category = category;
+                img.dataset.title = title; 
+                img.dataset.version = version;
+                img.dataset.unique = uniqueId;
+
+                // alt 태그 설정 - 검색에 사용됨 
+                img.alt = `${group} ${member} ${category} ${title} #${uniqueId}`;
 
               // ── 현재 userData에 따른 체크 정보 적용
               if (userData[image.unique_id]) {
@@ -1055,33 +1108,38 @@
               // 포인터 이벤트 설정
               img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
 
-              // 3) 오버레이: Firebase Storage URL에서 하위 폴더명 추출
+             // 3) 오버레이: Firebase Storage URL에서 하위 폴더명 추출
               const overlay = document.createElement('div');
               overlay.className = 'image-overlay';
 
-              // Firebase Storage URL에서 하위 폴더명 추출
+              // Firebase URL에서 하위 폴더 추출 (디버깅 코드 포함)
               try {
                 if (image.url && image.url.includes('firebasestorage')) {
-                  // 1. URL 디코딩
-                  const decodedPath = decodeURIComponent(image.url.split('/o/')[1].split('?')[0]);
+                  // URL 예시: .../o/images%2Fevent%2F파일명.jpg?alt=media...
+                  // 1. /o/ 다음부터 ? 이전까지 추출 (URL 인코딩된 경로)
+                  const encodedPath = image.url.split('/o/')[1].split('?')[0];
+                  console.log('인코딩된 경로:', encodedPath);
                   
-                  // 2. 경로 파싱 (일반적으로 'images/event/파일명.jpg' 형식)
+                  // 2. URL 디코딩
+                  const decodedPath = decodeURIComponent(encodedPath);
+                  console.log('디코딩된 경로:', decodedPath);
+                  
+                  // 3. 경로를 / 기준으로 분리
                   const pathParts = decodedPath.split('/');
+                  console.log('경로 부분들:', pathParts);
                   
-                  // 3. 'images' 다음의 하위 폴더가 표시할 타입 (event, benefit 등)
-                  if (pathParts.length >= 2) {
-                    // 첫 번째 항목이 'images'이면 두 번째 항목을 표시
-                    overlay.textContent = pathParts[1] || '';
+                  // 4. 하위 폴더명 추출 (일반적으로 "images/[하위폴더]/파일명.jpg" 형식)
+                  if (pathParts.length >= 2 && pathParts[0] === 'images') {
+                    overlay.textContent = pathParts[1] || ''; // 두 번째 부분이 하위 폴더명 (event, benefit 등)
+                    console.log('추출된 하위 폴더명:', pathParts[1]);
                   } else {
                     overlay.textContent = pathParts[0] || '';
                   }
-                } else if (image.file_type) {
-                  overlay.textContent = image.file_type;
                 } else {
-                  overlay.textContent = '';
+                  overlay.textContent = image.file_type || '';
                 }
               } catch (error) {
-                console.error('오버레이 텍스트 추출 오류:', error);
+                console.error('오버레이 텍스트 추출 오류:', error, image.url);
                 overlay.textContent = '';
               }
 
