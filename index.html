@@ -233,7 +233,7 @@
         // 🔥 자동 숨김 스크립트
         document.addEventListener('DOMContentLoaded', () => {
         // ⏰ 여기서 시간 변경 (밀리초 단위)
-        const LOADING_TIME = 3000; // 3초 (원하는 시간으로 변경)
+        const LOADING_TIME = 5000; // 5초 (원하는 시간으로 변경)
 
         setTimeout(() => {
         const loadingScreen = document.getElementById('loading-screen');
@@ -1020,34 +1020,10 @@
               // 포인터 이벤트 설정
               img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
 
-              // 3) 오버레이: 하위 폴더명 표시
+              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
               const overlay = document.createElement('div');
               overlay.className = 'image-overlay';
-
-              // Firebase Storage 경로에서 폴더 이름 추출
-              let displayType = '';
-              if (image.url && image.url.includes('/')) {
-                // URL에서 폴더 구조 추출 시도
-                const urlParts = image.url.split('/');
-                // URL에서 폴더 이름 찾기 (일반적으로 o/<폴더명>/ 패턴)
-                for (let i = 0; i < urlParts.length; i++) {
-                  if (urlParts[i] === 'o' && i+1 < urlParts.length) {
-                    displayType = urlParts[i+1];
-                    break;
-                  }
-                }
-                
-                // URL에서 찾지 못했다면 file_type 분석
-                if (!displayType && image.file_type) {
-                  const typeParts = image.file_type.split('/');
-                  displayType = typeParts.length > 1 ? typeParts[1] : '';
-                }
-              } else {
-                // 기존 방식 유지
-                displayType = image.category || image.type || '';
-              }
-
-              overlay.textContent = displayType;
+              overlay.textContent = image.type || image.file_type || '';
               container.appendChild(overlay);
 
               // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
