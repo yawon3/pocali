@@ -153,8 +153,99 @@
             </ul>
             </div>
         </div>
+        <!-- 로딩 화면 수정 부분 - Firebase Storage 이미지로 교체 -->
+        <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+        background-color: #f8f9fa; 
+        display: flex; flex-direction: column; 
+        align-items: center; justify-content: center; z-index: 9999; overflow: hidden;">
         
-       <!-- ✅ html2canvas 등 외부 라이브러리 로드 123-->
+        <!-- 배경 카드 효과 - Firebase Storage URL로 변경 -->
+        <div class="background-card" style="position: absolute; width: 150px; height: 210px; 
+        background-image: url('/static/images/default-card1.jpg');
+        background-size: cover; background-position: center;
+        border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        top: 15%; left: 10%; transform: rotate(-8deg); z-index: -1;"></div>
+      
+        <div class="background-card" style="position: absolute; width: 150px; height: 210px; 
+        background-image: url('/static/images/default-card2.jpg');
+        background-size: cover; background-position: center;
+        border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        top: 25%; right: 10%; transform: rotate(12deg); z-index: -1;"></div>
+      
+        <div class="background-card" style="position: absolute; width: 120px; height: 180px; 
+        background-image: url('/static/images/default-card3.jpg');
+        background-size: cover; background-position: center;
+        border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        bottom: 20%; left: 15%; transform: rotate(5deg); z-index: -1;"></div>
+      
+        <div class="background-card" style="position: absolute; width: 135px; height: 190px; 
+        background-image: url('/static/images/default-card4.jpg');
+        background-size: cover; background-position: center;
+        border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        bottom: 15%; right: 15%; transform: rotate(-15deg); z-index: -1;"></div>
+
+        <!-- 로고 영역 - 흰색으로 변경 및 그림자 추가 -->
+        <h1 style="margin-bottom: 30px; font-size: 32px; font-weight: 800; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.7);">POCALIST</h1>
+
+        <!-- 로딩 스피너 -->
+        <div class="loading-spinner" style="width: 50px; height: 50px; border: 3px solid rgba(0, 0, 0, 0.1); 
+              border-top: 3px solid #3498db; border-radius: 50%; 
+              animation: spin 1s linear infinite;"></div>
+
+        <!-- 로딩 텍스트 - 흰색으로 변경 및 그림자 추가 -->
+        <p style="margin-top: 20px; font-size: 18px; color: #fff; font-weight: 600; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);">아이브 모셔오는 중...</p>
+      </div>
+
+        <style>
+        @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+        }
+
+        @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(var(--rotate)); }
+        50% { transform: translateY(-15px) rotate(var(--rotate)); }
+        }
+
+        .background-card {
+        --rotate: -8deg;
+        animation: float 6s ease-in-out infinite;
+        animation-delay: calc(var(--index) * 0.5s);
+        }
+
+        .background-card:nth-child(1) { --index: 1; --rotate: -8deg; }
+        .background-card:nth-child(2) { --index: 2; --rotate: 12deg; }
+        .background-card:nth-child(3) { --index: 3; --rotate: 5deg; }
+        .background-card:nth-child(4) { --index: 4; --rotate: -15deg; }
+        </style>
+
+        <script>
+        // 로딩 화면 제거 함수
+        function hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.transition = 'opacity 0.5s';
+        setTimeout(() => loadingScreen.remove(), 500);
+        }
+        }
+
+        // 🔥 자동 숨김 스크립트
+        document.addEventListener('DOMContentLoaded', () => {
+        // ⏰ 여기서 시간 변경 (밀리초 단위)
+        const LOADING_TIME = 3000; // 3초 (원하는 시간으로 변경)
+
+        setTimeout(() => {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.transition = 'opacity 0.5s';
+        setTimeout(() => loadingScreen.remove(), 500);
+        }
+        }, LOADING_TIME);
+        });
+        </script>
+       <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
       <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
       <script>
         // 🔒 기본적인 소스코드 보호 + 강력한 대응
