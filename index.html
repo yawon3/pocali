@@ -1020,23 +1020,11 @@
               // 포인터 이벤트 설정
               img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
 
-              // ① URL에서 firebase path(“images/album/…”)만 떼내기
-              const raw = image.url
-                .split('/o/')[1]   // 예: images%2Falbum%2FIVE… 
-                .split('?')[0];    // query 제거
-              const decoded = decodeURIComponent(raw);    // “images/album/…jpg”
-              const parts   = decoded.split('/');         // ['images','album','…']
-              const subfolder = parts[1] || '';           // 'album' 또는 'event'
-
-              // ② img.dataset.subfolder 로도 저장
-              img.dataset.subfolder = subfolder;
-
-              // ③ 오버레이에 폴더명만 표시
+              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
               const overlay = document.createElement('div');
               overlay.className = 'image-overlay';
-              overlay.textContent = subfolder;
+              overlay.textContent = image.type || image.file_type || '';
               container.appendChild(overlay);
-
 
               // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
               let startX, startY;
