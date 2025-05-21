@@ -730,24 +730,25 @@
 
         /* ── 공통: 이미지 상세 모달 ───────────────────────── */
         function showModal(img) {
-        const $modal     = $('#photo-modal');
-        const $modalImg  = $('#modal-image');
-        const $modalInfo = $('#modal-info');
+          const $modal     = $('#photo-modal');
+          const $modalImg  = $('#modal-image');
+          const $modalInfo = $('#modal-info');
 
-        $modalImg.src = img.src;
+          $modalImg.src = img.src;
 
-        // 기존에 group만 찍던 부분을 바꿔줍니다.
-        $modalInfo.innerHTML = `
-          <p>폴더: ${img.dataset.subfolder || ''}</p>
-          <p>그룹: ${img.dataset.group     || ''}</p>
-          <p>멤버: ${img.dataset.member    || ''}</p>
-          <p>카테고리: ${img.dataset.category || ''} ${img.dataset.title || ''}</p>
-          <p>버전: ${img.dataset.version   || ''}</p>
-          <p>고유ID: #${img.dataset.unique  || ''}</p>
-        `;
+          // 기존에 group만 찍던 부분을 바꿔줍니다.
+          $modalInfo.innerHTML = `
+            <p>폴더: ${img.dataset.subfolder || ''}</p>
+            <p>그룹: ${img.dataset.group     || ''}</p>
+            <p>멤버: ${img.dataset.member    || ''}</p>
+            <p>카테고리: ${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+            <p>버전: ${img.dataset.version   || ''}</p>
+            <p>고유ID: #${img.dataset.unique  || ''}</p>
+          `;
 
-        $modal.style.display = 'block';
-      }
+          $modal.style.display = 'block';
+        }
+
 
         // 앱 초기화 시 실행할 함수
         async function initApp() {
@@ -1022,26 +1023,10 @@
               // 포인터 이벤트 설정
               img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
 
-              // ── (수정)
+              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
               const overlay = document.createElement('div');
               overlay.className = 'image-overlay';
-
-              // 1) URL에서 “images/album/…” 부분만 떼오기
-              const rawPath = image.url
-                .split('/o/')[1]         // e.g. images%2Falbum%2FIVE…
-                .split('?')[0];          // e.g. images%2Falbum%2F…
-              // 2) 디코딩 → “images/album/…” 
-              const decoded = decodeURIComponent(rawPath);
-              // 3) 슬래시로 분리 → ['images','album','FIVE…']
-              const parts = decoded.split('/');
-              // 4) [1]번째가 우리 하위폴더 명 (“album” 또는 “event”)
-              const subfolder = parts[1] || '';
-
-              // dataset 으로도 저장해 두면 modal 에서 꺼내 쓰기 편합니다.
-              img.dataset.subfolder = subfolder;
-
-              // overlay 에 찍기
-              overlay.textContent = subfolder;
+              overlay.textContent = image.type || image.file_type || '';
               container.appendChild(overlay);
 
               // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
