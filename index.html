@@ -158,32 +158,46 @@
         background-color: #f8f9fa; 
         display: flex; flex-direction: column; 
         align-items: center; justify-content: center; z-index: 9999; overflow: hidden;">
-        
-        <!-- 배경 카드 효과 -->
+
+        <!-- 배경 카드 효과 - 6개로 확장 -->
         <!-- 배경 카드 위치 조정 - 모바일에서도 분산되도록 -->
         <div class="background-card" style="position: absolute; width: 150px; height: 210px; 
         background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747290046/특전/IVE_AN_IE_yizhiyu_2.0_351504.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         top: 15%; left: 10%; transform: rotate(-8deg); z-index: -1;"></div>
-      
+
         <div class="background-card" style="position: absolute; width: 150px; height: 210px; 
         background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296186/event/IVE_WON_dashingdiva_351616.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         top: 25%; right: 10%; transform: rotate(12deg); z-index: -1;"></div>
-      
+
         <div class="background-card" style="position: absolute; width: 120px; height: 180px; 
         background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296129/event/IVE_AN_pepsi_winner_289545.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         bottom: 20%; left: 15%; transform: rotate(5deg); z-index: -1;"></div>
-      
+
         <div class="background-card" style="position: absolute; width: 135px; height: 190px; 
         background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296171/event/IVE_WON_innisfree_351611.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         bottom: 15%; right: 15%; transform: rotate(-15deg); z-index: -1;"></div>
+
+        <!-- 새로 추가된 5번째 카드 -->
+        <div class="background-card" style="position: absolute; width: 140px; height: 200px; 
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296129/event/IVE_AN_pepsi_winner_289545.jpg');
+        background-size: cover; background-position: center;
+        border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        top: 10%; left: 50%; transform: translateX(-50%) rotate(-10deg); z-index: -1;"></div>
+
+        <!-- 새로 추가된 6번째 카드 -->
+        <div class="background-card" style="position: absolute; width: 125px; height: 175px; 
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747290046/특전/IVE_AN_IE_yizhiyu_2.0_351504.jpg');
+        background-size: cover; background-position: center;
+        border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        bottom: 10%; left: 50%; transform: translateX(-50%) rotate(18deg); z-index: -1;"></div>
 
         <!-- 로고 영역 - 흰색으로 변경 및 그림자 추가 -->
         <h1 style="margin-bottom: 30px; font-size: 32px; font-weight: 800; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.7);">POCALIST</h1>
@@ -195,7 +209,7 @@
 
         <!-- 로딩 텍스트 - 흰색으로 변경 및 그림자 추가 -->
         <p style="margin-top: 20px; font-size: 18px; color: #fff; font-weight: 600; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);">아이브 모셔오는 중...</p>
-      </div>
+        </div>
 
         <style>
         @keyframes spin {
@@ -218,6 +232,8 @@
         .background-card:nth-child(2) { --index: 2; --rotate: 12deg; }
         .background-card:nth-child(3) { --index: 3; --rotate: 5deg; }
         .background-card:nth-child(4) { --index: 4; --rotate: -15deg; }
+        .background-card:nth-child(5) { --index: 5; --rotate: -10deg; }
+        .background-card:nth-child(6) { --index: 6; --rotate: 18deg; }
         </style>
 
         <script>
@@ -234,7 +250,7 @@
         // 🔥 자동 숨김 스크립트
         document.addEventListener('DOMContentLoaded', () => {
         // ⏰ 여기서 시간 변경 (밀리초 단위)
-        const LOADING_TIME = 8000; // 8초 (원하는 시간으로 변경)
+        const LOADING_TIME = 5000; // 5초 (원하는 시간으로 변경)
 
         setTimeout(() => {
         const loadingScreen = document.getElementById('loading-screen');
@@ -249,62 +265,94 @@
        <!-- ✅ html2canvas 등 외부 라이브러리 로드 -->
       <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
       <script>
-        // 🔒 기본적인 소스코드 보호 + 강력한 대응
-           (function() {
-            'use strict';
-            
-            // 1. 우클릭 방지
-            document.addEventListener('contextmenu', e => {
+       // 🔒 기본적인 소스코드 보호 + 강력한 대응
+        (function() {
+          'use strict';
+          
+          // 1. 우클릭 방지
+          document.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            return false;
+          });
+          
+          // 2. 키보드 단축키 방지
+          document.addEventListener('keydown', e => {
+            // F12 (개발자도구)
+            if (e.keyCode === 123) {
               e.preventDefault();
               return false;
-            });
+            }
             
-            // 2. 키보드 단축키 방지
-            document.addEventListener('keydown', e => {
-              // F12 (개발자도구)
-              if (e.keyCode === 123) {
-                e.preventDefault();
-                return false;
-              }
-              
-              // Ctrl+Shift+I (개발자도구)
-              if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
-                e.preventDefault();
-                return false;
-              }
-              
-              // Ctrl+Shift+J (콘솔)
-              if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
-                e.preventDefault();
-                return false;
-              }
-              
-              // Ctrl+U (소스보기)
-              if (e.ctrlKey && e.keyCode === 85) {
-                e.preventDefault();
-                return false;
-              }
-              
-              // Ctrl+S (저장)
-              if (e.ctrlKey && e.keyCode === 83) {
-                e.preventDefault();
-                return false;
-              }
-            });
+            // Ctrl+Shift+I (개발자도구)
+            if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+              e.preventDefault();
+              return false;
+            }
             
-            // ✅ 개발자도구 감지 부분 제거 (스크롤 이슈 해결)
+            // Ctrl+Shift+J (콘솔)
+            if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
+              e.preventDefault();
+              return false;
+            }
             
-            // Console 메시지 덮어쓰기 (선택사항)
-            /*
-            setInterval(() => {
-              console.clear();
-              console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold;');
-              console.log('%c이 영역은 개발자를 위한 콘솔입니다.\n악의적인 코드를 입력하면 보안 문제가 발생할 수 있습니다.', 
-                          'color: red; font-size: 14px;');
-            }, 3000);
-            */
+            // Ctrl+U (소스보기)
+            if (e.ctrlKey && e.keyCode === 85) {
+              e.preventDefault();
+              return false;
+            }
             
-          })();
+            // Ctrl+S (저장)
+            if (e.ctrlKey && e.keyCode === 83) {
+              e.preventDefault();
+              return false;
+            }
+          });
+          
+          // ✅ 개발자도구 감지 기능 복원
+          let devtools = {
+            open: false,
+            orientation: null
+          };
+          
+          const threshold = 160;
+          
+          setInterval(() => {
+            if (window.outerHeight - window.innerHeight > threshold || 
+                window.outerWidth - window.innerWidth > threshold) {
+              if (!devtools.open) {
+                devtools.open = true;
+                console.log('개발자도구 감지됨!');
+                
+                // 🚨 개발자도구 감지 시 리다이렉트
+                window.location.href = 'https://www.google.com';
+              }
+            } else {
+              devtools.open = false;
+            }
+          }, 500);
+          
+          // 추가적인 감지 방법들
+          // 개발자도구 콘솔에서 실행되는 코드 감지
+          let devToolsChecker = () => {
+            let before = new Date();
+            (function(){}).constructor("debugger")();
+            let after = new Date();
+            if (after - before > 100) {
+              window.location.href = 'https://www.google.com';
+            }
+          };
+          
+          // 주기적으로 검사
+          setInterval(devToolsChecker, 1000);
+          
+          // Console 메시지 덮어쓰기
+          setInterval(() => {
+            console.clear();
+            console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold;');
+            console.log('%c이 영역은 개발자를 위한 콘솔입니다.\n악의적인 코드를 입력하면 보안 문제가 발생할 수 있습니다.', 
+                        'color: red; font-size: 14px;');
+          }, 3000);
+        })();
       </script>
       <script>
         /* ==========================================================
