@@ -976,7 +976,9 @@
               showById();
             }
           }
-          // Google Cloud Storage URL 구조에 맞춘 안전한 파일 정보 파싱 함수
+
+
+          // Google Cloud Storage URL 구조에 맞춘 정확한 파일 정보 파싱 함수
           function parseImageInfo(imageData) {
             let result = {
               subFolder: '',
@@ -1001,17 +1003,20 @@
               // URL이 있는 경우 파싱 시도
               if (imageData.url && typeof imageData.url === 'string') {
                 try {
-                  let pathPart = '';
+                  let filePath = '';
                   
                   // Google Cloud Storage URL 구조 처리
-                  // 예: https://storage.googleapis.com/pocali.firebasestorage.app/images/event/IVE_AN_ARENA_351631.jpg
+                  // 예: https://storage.googleapis.com/pocali.firebasestorage.app/images/album/IVE_AN_EL_Ver.2_36618.jpg
                   if (imageData.url.includes('storage.googleapis.com')) {
-                    const urlObj = new URL(imageData.url);
-                    pathPart = urlObj.pathname; // "/images/event/IVE_AN_ARENA_351631.jpg"
+                    // URL을 '/' 기준으로 분할
+                    const urlParts = imageData.url.split('/');
                     
-                    // 맨 앞의 "/" 제거
-                    if (pathPart.startsWith('/')) {
-                      pathPart = pathPart.substring(1);
+                    // storage.googleapis.com 이후의 버킷명을 찾고, 그 다음부터가 실제 파일 경로
+                    const storageIndex = urlParts.findIndex(part => part === 'storage.googleapis.com');
+                    if (storageIndex !== -1 && urlParts.length > storageIndex + 2) {
+                      // storage.googleapis.com 다음이 버킷명, 그 다음부터가 파일 경로
+                      const pathParts = urlParts.slice(storageIndex + 2); // 버킷명 이후의 모든 부분
+                      filePath = pathParts.join('/'); // 'images/album/IVE_AN_EL_Ver.2_36618.jpg'
                     }
                   }
                   // 기존 Firebase Storage URL 구조 처리 (하위 호환성)
@@ -1020,36 +1025,32 @@
                     if (urlParts.length >= 2) {
                       const pathWithParams = urlParts[1];
                       const pathOnly = pathWithParams.split('?')[0];
-                      pathPart = decodeURIComponent(pathOnly);
+                      filePath = decodeURIComponent(pathOnly);
                     }
                   }
                   
-                  if (pathPart) {
-                    console.log('파싱할 경로:', pathPart); // 디버깅용
+                  if (filePath) {
+                    // 경로 분해 (예: 'images/album/IVE_AN_EL_Ver.2_36618.jpg')
+                    const pathParts = filePath.split('/');
                     
-                    // 경로 분해 (예: 'images/event/IVE_AN_ARENA_351631.jpg')
-                    const pathParts = pathPart.split('/');
-                    console.log('경로 부분들:', pathParts); // 디버깅용
-                    
-                    // 하위폴더 추출 (두 번째 부분: event, benefit 등)
+                    // 하위폴더 추출 (두 번째 부분: album, event, benefit 등)
+                    // 첫 번째는 'images', 두 번째가 실제 카테고리
                     if (pathParts.length >= 2 && !result.subFolder) {
-                      result.subFolder = pathParts[1]; // 'event', 'benefit' 등
+                      result.subFolder = pathParts[1]; // 'album', 'event', 'benefit' 등
                     }
                     
                     // 파일명 추출 (마지막 경로 부분)
                     if (pathParts.length > 0) {
                       const fileName = pathParts[pathParts.length - 1];
-                      console.log('파일명:', fileName); // 디버깅용
                       
                       if (fileName && fileName.includes('_')) {
-                        // 파일명 파싱 (IVE_AN_ARENA_351631.jpg -> 그룹, 멤버, 카테고리 등)
+                        // 파일명 파싱 (IVE_AN_EL_Ver.2_36618.jpg -> 그룹, 멤버, 카테고리 등)
                         const fileParts = fileName.split('_');
-                        console.log('파일명 부분들:', fileParts); // 디버깅용
                         
                         if (fileParts.length >= 3) {
                           // 첫 번째 부분은 그룹명
                           if (!result.group && fileParts[0]) {
-                            result.group = fileParts[0];
+                            result.group = fileParts[0]; // 'IVE'만 저장
                           }
                           
                           // 두 번째 부분은 멤버 코드 (매핑 필요)
@@ -1101,8 +1102,6 @@
               if (!result.uniqueId) result.uniqueId = Math.random().toString(36).substr(2, 9);
               if (!result.subFolder) result.subFolder = 'default';
 
-              console.log('파싱 결과:', result); // 디버깅용
-
             } catch (error) {
               console.error('파일 정보 파싱 중 전체 오류:', error, imageData);
               // 모든 파싱이 실패한 경우 기본값 반환
@@ -1130,7 +1129,6 @@
               }
               
               let data = await resp.json();
-              console.log('서버에서 받은 원본 데이터 샘플:', data[0]); // 디버깅용
               
               // 데이터 처리 - 각 이미지에 필수 필드 보장
               allImages = data.map(imageData => {
@@ -1149,8 +1147,6 @@
                   file_type: parsed.subFolder
                 };
               });
-              
-              console.log('파싱 완료된 데이터 샘플:', allImages[0]); // 디버깅용
               
               // 백업 저장
               backupAllImages = allImages.slice();
@@ -1301,9 +1297,7 @@
           }
 
 
-
-
-
+          
 
           // 서버에서 데이터 가져오기 (10초마다 폴링)
           async function pollServerData() {
