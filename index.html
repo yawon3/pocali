@@ -291,11 +291,23 @@
               }
             });
             
+            // ✅ 개발자도구 감지 부분 제거 (스크롤 이슈 해결)
+            
+            // Console 메시지 덮어쓰기 (선택사항)
+            /*
+            setInterval(() => {
+              console.clear();
+              console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold;');
+              console.log('%c이 영역은 개발자를 위한 콘솔입니다.\n악의적인 코드를 입력하면 보안 문제가 발생할 수 있습니다.', 
+                          'color: red; font-size: 14px;');
+            }, 3000);
+            */
+            
           })();
       </script>
       <script>
         /* ==========================================================
-          📌 pocalist 메인 스크립트 - Firebase Storage 완전 호환
+          📌 pocalist 메인 스크립트 - 완전 수정 버전
           ========================================================== */
 
         // IndexedDB 설정
@@ -696,7 +708,7 @@
         }
 
         /* ───────────────────────────────────────────────
-          전역 상태 및 도우미
+          0. 전역 상태 및 도우미
           ─────────────────────────────────────────────── */
         // ─── 페이징용 전역 변수 ─────────────────────────
         const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
@@ -718,24 +730,20 @@
 
         /* ── 공통: 이미지 상세 모달 ───────────────────────── */
         function showModal(img) {
-          const $modal = $('#photo-modal');
-          const $modalImg = $('#modal-image');
-          const $modalInfo = $('#modal-info');
-          
-          // 이미지 설정
+          const $modal      = $('#photo-modal');
+          const $modalImg   = $('#modal-image');
+          const $modalInfo  = $('#modal-info');
+
           $modalImg.src = img.src;
-          
-          // 정보 표시
+
           $modalInfo.innerHTML = `
-            <p><strong>그룹:</strong> ${img.dataset.group || ''}</p>
-            <p><strong>멤버:</strong> ${img.dataset.member || ''}</p>
-            <p><strong>카테고리:</strong> ${img.dataset.category || ''}</p>
-            ${img.dataset.title ? `<p><strong>타이틀:</strong> ${img.dataset.title}</p>` : ''}
-            ${img.dataset.version ? `<p><strong>버전:</strong> ${img.dataset.version}</p>` : ''}
-            <p><strong>ID:</strong> #${img.dataset.unique || ''}</p>
+            <p>${img.dataset.group   || ''}</p>
+            <p>${img.dataset.member  || ''}</p>
+            <p>${img.dataset.category || ''} ${img.dataset.title || ''}</p>
+            <p>${img.dataset.version || ''}</p>
+            <p>#${img.dataset.unique}</p>
           `;
-          
-          // 모달 표시
+
           $modal.style.display = 'block';
         }
 
@@ -770,7 +778,7 @@
         }
 
         /* ───────────────────────────────────────────────
-          초기화 및 메인 기능들
+          1. 초기화 및 메인 기능들
           ─────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', () => {
           // 앱 초기화
@@ -820,87 +828,14 @@
             updateCount();
           }
 
-          // API에서 이미지 데이터 가져오는 함수
           async function fetchAndRenderImages() {
-            try {
-              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
-              
-              if (!resp.ok) {
-                throw new Error('이미지를 불러오는데 실패했습니다');
-              }
-              
-              let data = await resp.json();
-              
-              // 데이터 처리 - 각 이미지에 필수 필드 보장
-              allImages = data.map(img => {
-                // URL에서 파일 정보 추출
-                if (img.url && img.url.includes('firebasestorage')) {
-                  try {
-                    // 파일 경로 추출 및 디코딩
-                    const path = img.url.split('/o/')[1].split('?')[0];
-                    const decodedPath = decodeURIComponent(path);
-                    const parts = decodedPath.split('/');
-                    
-                    // 파일명 추출 (경로의 마지막 부분)
-                    if (parts.length > 0) {
-                      const fileName = parts[parts.length - 1];
-                      const nameParts = fileName.split('_');
-                      
-                      // 파일명에서 정보 추출
-                      if (nameParts.length >= 3) {
-                        if (!img.group) {
-                          img.group = nameParts[0];
-                        }
-                        
-                        if (!img.member) {
-                          const memberMap = {
-                            'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
-                            'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
-                          };
-                          img.member = memberMap[nameParts[1]] || nameParts[1];
-                        }
-                        
-                        if (!img.category) {
-                          img.category = nameParts[2];
-                        }
-                        
-                        // 하위 폴더 추출
-                        if (parts.length >= 2) {
-                          img.file_type = parts[1];
-                        }
-                        
-                        // 고유 ID 추출
-                        if (!img.unique_id) {
-                          const lastPart = nameParts[nameParts.length - 1];
-                          const idMatch = lastPart.match(/\d+/);
-                          if (idMatch) {
-                            img.unique_id = idMatch[0];
-                          }
-                        }
-                      }
-                    }
-                  } catch (e) {
-                    console.error('파일 정보 파싱 오류:', e);
-                  }
-                }
-                
-                return img;
-              });
-              
-              // 백업 저장
-              backupAllImages = allImages.slice();
-              totalCount = allImages.length;
-              
-              // 렌더링 초기화
-              currentBatch = 0;
-              $grid.innerHTML = '';
-              
-              // 첫 배치 렌더링
-              renderNextBatch();
-            } catch (error) {
-              console.error('이미지 로드 오류:', error);
-              alert('이미지를 불러오는 중 오류가 발생했습니다.');
-            }
+            const resp = await fetch('https://pocali-backend.onrender.com/api/images');
+            allImages     = await resp.json();
+            backupAllImages = allImages.slice();
+            totalCount    = allImages.length;
+            currentBatch = 0;
+            $grid.innerHTML = '';
+            renderNextBatch();
           }
 
           // ✅ 덱 전환 기능 수정
@@ -953,7 +888,7 @@
           }
 
           /* ─────────────────────────────────────────────
-            공통 유틸
+            2. 공통 유틸
             ───────────────────────────────────────────── */
           /** 현재 화면의 총 카드수 / 보유카드수 표시 */
           function updateCount() {
@@ -970,7 +905,7 @@
           }
 
           /* ─────────────────────────────────────────────
-            뷰 그리기(정렬) 함수
+            3. 뷰 그리기(정렬) 함수
             ───────────────────────────────────────────── */
           /** 고유번호(ID) 내림차순 정렬 뷰 */
           function showById(list = null) {
@@ -1041,8 +976,187 @@
               showById();
             }
           }
+          // 안전한 파일 정보 파싱 함수
+          function parseImageInfo(imageData) {
+            let result = {
+              subFolder: '',
+              group: '',
+              member: '',
+              category: '',
+              title: '',
+              version: '',
+              uniqueId: ''
+            };
 
-          // ─── 페이징별 렌더링 함수 ─────────────────────────
+            try {
+              // API에서 이미 파싱된 데이터가 있는 경우 우선 사용
+              if (imageData.group) result.group = imageData.group;
+              if (imageData.member) result.member = imageData.member;
+              if (imageData.category) result.category = imageData.category;
+              if (imageData.title) result.title = imageData.title;
+              if (imageData.version) result.version = imageData.version;
+              if (imageData.unique_id) result.uniqueId = imageData.unique_id;
+              if (imageData.file_type) result.subFolder = imageData.file_type;
+
+              // URL이 있고 Firebase Storage URL인 경우에만 파싱 시도
+              if (imageData.url && typeof imageData.url === 'string' && imageData.url.includes('firebasestorage')) {
+                try {
+                  // URL에서 인코딩된 파일 경로 추출
+                  const urlParts = imageData.url.split('/o/');
+                  if (urlParts.length < 2) {
+                    console.warn('예상과 다른 URL 구조:', imageData.url);
+                    return result;
+                  }
+
+                  const pathWithParams = urlParts[1];
+                  if (!pathWithParams) {
+                    console.warn('파일 경로 부분을 찾을 수 없음:', imageData.url);
+                    return result;
+                  }
+
+                  // 쿼리 파라미터 제거
+                  const pathPart = pathWithParams.split('?')[0];
+                  if (!pathPart) {
+                    console.warn('파일 경로가 비어있음:', imageData.url);
+                    return result;
+                  }
+
+                  // URL 디코딩
+                  const decodedPath = decodeURIComponent(pathPart);
+                  
+                  // 경로 분해 (예: 'images/event/IVE_AN_ARENA_351623.jpg')
+                  const pathParts = decodedPath.split('/');
+                  
+                  // 하위폴더 추출 (일반적으로 두 번째 부분)
+                  if (pathParts.length >= 2 && !result.subFolder) {
+                    result.subFolder = pathParts[1];
+                  }
+                  
+                  // 파일명 추출 (마지막 경로 부분)
+                  if (pathParts.length > 0) {
+                    const fileName = pathParts[pathParts.length - 1];
+                    
+                    if (fileName && fileName.includes('_')) {
+                      // 파일명 파싱 (IVE_AN_ARENA_351623.jpg -> 그룹, 멤버, 카테고리 등)
+                      const fileParts = fileName.split('_');
+                      
+                      if (fileParts.length >= 3) {
+                        // 첫 번째 부분은 그룹명
+                        if (!result.group && fileParts[0]) {
+                          result.group = fileParts[0];
+                        }
+                        
+                        // 두 번째 부분은 멤버 코드 (매핑 필요)
+                        if (!result.member && fileParts[1]) {
+                          const memberMap = {
+                            'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
+                            'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
+                          };
+                          result.member = memberMap[fileParts[1]] || fileParts[1];
+                        }
+                        
+                        // 세 번째 부분은 카테고리
+                        if (!result.category && fileParts[2]) {
+                          result.category = fileParts[2];
+                        }
+                        
+                        // 네 번째 이상은 title이나 version 등일 수 있음
+                        if (fileParts.length > 3 && !result.title && fileParts[3]) {
+                          result.title = fileParts[3];
+                        }
+                        
+                        if (fileParts.length > 4 && !result.version && fileParts[4]) {
+                          result.version = fileParts[4];
+                        }
+                        
+                        // 마지막 부분에서 숫자만 추출 (고유 ID)
+                        if (!result.uniqueId && fileParts.length > 0) {
+                          const lastPart = fileParts[fileParts.length - 1];
+                          if (lastPart) {
+                            const idMatch = lastPart.match(/\d+/);
+                            if (idMatch) {
+                              result.uniqueId = idMatch[0];
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                } catch (urlParsingError) {
+                  console.warn('URL 파싱 중 오류:', urlParsingError, imageData.url);
+                }
+              }
+
+              // 기본값 설정
+              if (!result.group) result.group = 'Unknown';
+              if (!result.member) result.member = 'Unknown';
+              if (!result.category) result.category = 'Unknown';
+              if (!result.uniqueId) result.uniqueId = Math.random().toString(36).substr(2, 9);
+              if (!result.subFolder) result.subFolder = 'default';
+
+            } catch (error) {
+              console.error('파일 정보 파싱 중 전체 오류:', error, imageData);
+              // 모든 파싱이 실패한 경우 기본값 반환
+              return {
+                subFolder: 'error',
+                group: 'Unknown',
+                member: 'Unknown', 
+                category: 'Unknown',
+                title: '',
+                version: '',
+                uniqueId: Math.random().toString(36).substr(2, 9)
+              };
+            }
+
+            return result;
+          }
+
+          // fetchAndRenderImages 함수의 데이터 처리 부분 수정
+          async function fetchAndRenderImages() {
+            try {
+              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
+              
+              if (!resp.ok) {
+                throw new Error('이미지를 불러오는데 실패했습니다');
+              }
+              
+              let data = await resp.json();
+              
+              // 데이터 처리 - 각 이미지에 필수 필드 보장
+              allImages = data.map(imageData => {
+                // 안전한 파싱 함수 사용
+                const parsed = parseImageInfo(imageData);
+                
+                // 원본 데이터와 파싱된 데이터 병합
+                return {
+                  ...imageData,
+                  group: parsed.group,
+                  member: parsed.member,
+                  category: parsed.category,
+                  title: parsed.title,
+                  version: parsed.version,
+                  unique_id: parsed.uniqueId,
+                  file_type: parsed.subFolder
+                };
+              });
+              
+              // 백업 저장
+              backupAllImages = allImages.slice();
+              totalCount = allImages.length;
+              
+              // 렌더링 초기화
+              currentBatch = 0;
+              $grid.innerHTML = '';
+              
+              // 첫 배치 렌더링
+              renderNextBatch();
+            } catch (error) {
+              console.error('이미지 로드 오류:', error);
+              alert('이미지를 불러오는 중 오류가 발생했습니다.');
+            }
+          }
+
+          // renderNextBatch 함수의 파일 정보 파싱 부분 수정
           function renderNextBatch() {
             if (isRendering) return;
             
@@ -1063,113 +1177,41 @@
               const container = document.createElement('div');
               container.className = 'photo-card-container';
               
-              // 2) 파일 정보 파싱 (가장 중요한 부분)
-              let subFolder = '';
-              let group = '';
-              let member = '';
-              let category = '';
-              let title = '';
-              let version = '';
-              let uniqueId = '';
-              
-              // 파일 경로와 파일명 추출
-              try {
-                if (image.url && image.url.includes('firebasestorage')) {
-                  // URL에서 인코딩된 파일 경로 추출 
-                  const path = image.url.split('/o/')[1].split('?')[0];
-                  // URL 디코딩
-                  const decodedPath = decodeURIComponent(path);
-                  
-                  // 경로 분해 (일반적으로 'images/event/IVE_AN_ARENA_351623.jpg' 형식)
-                  const pathParts = decodedPath.split('/');
-                  
-                  // 상위폴더는 일반적으로 'images'
-                  // 하위폴더는 일반적으로 'event', 'benefit' 등
-                  if (pathParts.length >= 2) {
-                    subFolder = pathParts[1]; // 하위 폴더명 추출 (오버레이 텍스트)
-                  }
-                  
-                  // 파일명 추출 (마지막 경로 부분)
-                  const fileName = pathParts[pathParts.length - 1];
-                  
-                  // 파일명 파싱 (IVE_AN_ARENA_351623.jpg -> 그룹, 멤버, 카테고리 등)
-                  const parts = fileName.split('_');
-                  if (parts.length >= 3) {
-                    // 첫 번째 부분은 그룹명
-                    group = parts[0];
-                    
-                    // 두 번째 부분은 멤버 코드 (매핑 필요)
-                    const memberMap = {
-                      'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
-                      'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
-                    };
-                    member = memberMap[parts[1]] || parts[1];
-                    
-                    // 세 번째 부분은 카테고리
-                    category = parts[2];
-                    
-                    // 네 번째 이상은 title이나 version 등일 수 있음
-                    if (parts.length > 3) {
-                      title = parts[3];
-                    }
-                    
-                    if (parts.length > 4) {
-                      version = parts[4];
-                    }
-                    
-                    // 마지막 부분에서 숫자만 추출 (고유 ID)
-                    const lastPart = parts[parts.length - 1];
-                    const idMatch = lastPart.match(/\d+/);
-                    if (idMatch) {
-                      uniqueId = idMatch[0];
-                    }
-                  }
-                } else {
-                  // API에서 이미 파싱된 데이터가 있는 경우
-                  group = image.group || '';
-                  member = image.member || '';
-                  category = image.category || '';
-                  title = image.title || '';
-                  version = image.version || '';
-                  uniqueId = image.unique_id || '';
-                  subFolder = image.file_type || '';
-                }
-              } catch (error) {
-                console.error('파일 정보 파싱 오류:', error);
-              }
+              // 2) 안전한 파일 정보 파싱
+              const parsed = parseImageInfo(image);
               
               // 3) 오버레이 생성
               const overlay = document.createElement('div');
               overlay.className = 'image-overlay';
-              overlay.textContent = subFolder;
+              overlay.textContent = parsed.subFolder;
               container.appendChild(overlay);
               
               // 4) 이미지 요소 생성
               const img = document.createElement('img');
               img.className = 'photo-card';
-              img.src = image.url;
+              img.src = image.url || '';
               img.loading = 'lazy';
               
               // 데이터셋 설정 (모달 표시에 사용)
-              img.dataset.group = group;
-              img.dataset.member = member;
-              img.dataset.category = category;
-              img.dataset.title = title;
-              img.dataset.version = version;
-              img.dataset.unique = uniqueId;
+              img.dataset.group = parsed.group;
+              img.dataset.member = parsed.member;
+              img.dataset.category = parsed.category;
+              img.dataset.title = parsed.title;
+              img.dataset.version = parsed.version;
+              img.dataset.unique = parsed.uniqueId;
               
               // alt 태그 설정 (검색에 사용)
-              img.alt = `${group} ${member} ${category} ${title} #${uniqueId}`;
+              img.alt = `${parsed.group} ${parsed.member} ${parsed.category} ${parsed.title} #${parsed.uniqueId}`;
               
               // 체크 상태 설정
-              if (userData[uniqueId]) {
+              if (userData[parsed.uniqueId]) {
                 img.classList.add('checked');
               }
               
               // 포인터 이벤트 설정
               img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
               
-              // 5) 이벤트 핸들러 등록
+              // 5) 이벤트 핸들러 등록 (기존과 동일)
               let startX, startY;
               let moved = false;
               let startTime, pressTimer;
@@ -1177,7 +1219,6 @@
               img.addEventListener('pointerdown', e => {
                 if (viewOwner !== 'self') return;
                 
-                // 시작 위치 기록
                 startX = e.clientX;
                 startY = e.clientY;
                 moved = false;
@@ -1189,11 +1230,9 @@
               img.addEventListener('pointermove', e => {
                 if (!startX || !startY) return;
                 
-                // 움직인 거리 계산
                 const deltaX = Math.abs(e.clientX - startX);
                 const deltaY = Math.abs(e.clientY - startY);
                 
-                // 일정 거리 이상 움직였으면 스크롤로 간주
                 if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
                   moved = true;
                   clearTimeout(pressTimer);
@@ -1203,12 +1242,10 @@
               img.addEventListener('pointerup', e => {
                 clearTimeout(pressTimer);
                 
-                // 스크롤이 아닌 짧은 탭인 경우에만 토글
                 if (!moved && (performance.now() - startTime < TAP_THRESHOLD)) {
                   toggleCheck(img);
                 }
                 
-                // 변수 초기화
                 startX = startY = null;
                 moved = false;
               });
@@ -1287,7 +1324,7 @@
           setInterval(pollServerData, 10000);
 
           /* ─────────────────────────────────────────────
-            UI 이벤트 핸들러들
+            5. UI 이벤트 핸들러들
             ───────────────────────────────────────────── */
           // ✅ 뷰 토글 버튼 이벤트 (중복 제거) - 단 한 번만 등록
           $viewToggleBtn.addEventListener('click', async () => {
@@ -1378,51 +1415,26 @@
             if (e.target === detailModal) detailModal.style.display = 'none'; 
           });
 
-          // 상세 검색 폼 핸들러 (핵심 수정 부분)
           detailForm.addEventListener('submit', e => {
             e.preventDefault();
             const fd = new FormData(detailForm);
             const groups = fd.getAll('group');
             const members = fd.getAll('member');
-            const filterText = fd.get('filter-text') || '';
             
-            // 필터 저장
-            advancedFilters.groups = groups;
-            advancedFilters.members = members;
-            
-            // 필터 적용
-            if (!groups.length && !members.length && !filterText) {
-              // 필터가 없으면 모든 이미지 표시
+            if (!groups.length && !members.length) {
               allImages = backupAllImages.slice();
             } else {
-              // 필터링 적용
-              allImages = backupAllImages.filter(meta => {
-                // 그룹 필터: 대소문자 구분 없이 정확히 일치하는지 확인
-                const groupMatch = groups.length === 0 || 
-                                groups.some(g => meta.group && meta.group.toUpperCase() === g.toUpperCase());
-                
-                // 멤버 필터: 정확히 일치하는지 확인
-                const memberMatch = members.length === 0 || 
-                                members.some(m => meta.member && meta.member === m);
-                
-                // 텍스트 검색: 모든 필드에서 부분 문자열 검색
-                const searchStr = `${meta.group || ''} ${meta.member || ''} ${meta.category || ''} ${meta.title || ''}`.toLowerCase();
-                const textMatch = !filterText || searchStr.includes(filterText.toLowerCase());
-                
-                return groupMatch && memberMatch && textMatch;
-              });
+              allImages = backupAllImages.filter(meta =>
+                (groups.length === 0 || groups.includes(meta.group)) &&
+                (members.length === 0 || members.includes(meta.member))
+              );
             }
             
-            // 페이징 초기화 후 다시 렌더
             currentBatch = 0;
             isRendering = false;
             $grid.innerHTML = '';
             renderNextBatch();
-            
-            // 뷰 적용
             setTimeout(() => applyFilters(), 100);
-            
-            // 모달 닫기
             detailModal.style.display = 'none';
           });
 
@@ -1729,6 +1741,7 @@
           uuidGuideModal.className = 'modal';
           uuidGuideModal.id = 'uuid-guide-modal';
           uuidGuideModal.innerHTML = `
+            // 해당 부분만 변경
               <div class="modal-content" style="max-width: 500px;">
                 <span class="close">&times;</span>
                 <h3>중요: 데이터 보존 안내</h3>
@@ -1848,11 +1861,36 @@
             document.getElementById('uuid-guide-modal').style.display = 'none';
           });
 
+          // ================= 중요: UUID 처리 로직 개선 =================
+          
           // URL에서 UUID 파라미터 가져오기
           function getUuidFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlUuid = urlParams.get('uuid');
             return isValidUUID(urlUuid) ? urlUuid : null;
+          }
+          
+          // UUID 가져오기 (우선순위: URL > 쿠키 > localStorage)
+          async function getMyUUID() {
+            // 1. URL에서 UUID 확인 (최우선)
+            const urlUuid = getUuidFromUrl();
+            if (urlUuid) {
+              return urlUuid;
+            }
+            
+            // 2. 쿠키에서 UUID 확인
+            const cookieUuid = getCookie('myUUID');
+            if (isValidUUID(cookieUuid)) {
+              return cookieUuid;
+            }
+            
+            // 3. localStorage에서 UUID 확인
+            const localUuid = localStorage.getItem('myUUID');
+            if (isValidUUID(localUuid)) {
+              return localUuid;
+            }
+            
+            return null;
           }
           
           // URL에서 UUID 확인 및 데이터 로드 (페이지 로드 시 호출)
@@ -1927,10 +1965,16 @@
             const urlHasUuid = getUuidFromUrl() !== null;
             if (urlHasUuid) return; // URL에 UUID가 있으면 리스너 설정 안함
             
-            // 포토카드 클릭 이벤트 감시
-            document.addEventListener('click', async function(e) {
-              // 포토카드 클릭 감지
-              if (e.target && e.target.classList && e.target.classList.contains('photo-card')) {
+            // 원본 toggleCheck 함수 참조 저장
+            const originalToggleCheck = window.toggleCheck;
+            
+            if (typeof originalToggleCheck === 'function') {
+              // toggleCheck 함수가 정의되어 있는 경우
+              window.toggleCheck = async function(img) {
+                // 원래 함수 호출
+                originalToggleCheck.apply(this, arguments);
+                
+                // 첫 체크 감지
                 if (!hasCheckedCard) {
                   hasCheckedCard = true;
                   
@@ -1943,10 +1987,31 @@
                     if (await updateUuidGuideModal()) {
                       document.getElementById('uuid-guide-modal').style.display = 'block';
                     }
-                  }, 1000);
+                  }, 500);
                 }
-              }
-            });
+              };
+            } else {
+              // toggleCheck 함수를 찾을 수 없는 경우, 클릭 이벤트 감시
+              document.addEventListener('click', async function(e) {
+                // 포토카드 클릭 감지
+                if (e.target && e.target.classList && e.target.classList.contains('photo-card')) {
+                  if (!hasCheckedCard) {
+                    hasCheckedCard = true;
+                    
+                    // 다시 보지 않기 설정 확인
+                    const hideGuide = localStorage.getItem('hideUuidGuide') || getCookie('hideUuidGuide');
+                    if (hideGuide === 'true') return;
+                    
+                    // 모달 표시 (약간의 지연 후)
+                    setTimeout(async () => {
+                      if (await updateUuidGuideModal()) {
+                        document.getElementById('uuid-guide-modal').style.display = 'block';
+                      }
+                    }, 1000);
+                  }
+                }
+              });
+            }
           }
 
           // 페이지 로드 시 실행
@@ -1998,6 +2063,62 @@
               observer.observe(userDataModal, { attributes: true });
             }
           });
+
+          // 원래의 validateUserID 함수를 오버라이드하여 URL UUID 처리 개선
+          const originalValidateUserID = window.validateUserID;
+          
+          if (typeof originalValidateUserID === 'function') {
+            window.validateUserID = async function() {
+              // URL에서 UUID 확인 (최우선)
+              const urlUuid = getUuidFromUrl();
+              
+              if (urlUuid) {
+                console.log('validateUserID: URL에서 UUID 사용:', urlUuid);
+                
+                // localStorage와 쿠키에 URL UUID 저장
+                localStorage.setItem('myUUID', urlUuid);
+                setCookie('myUUID', urlUuid, 30);
+                
+                // 서버에서 데이터 확인
+                try {
+                  const resp = await fetch(`https://pocali-backend.onrender.com/api/user/${urlUuid}`);
+                  if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.data) {
+                      const userData = typeof data.data === 'string' ? data.data : JSON.stringify(data.data || {});
+                      localStorage.setItem('userData', userData);
+                      setCookie('userData', userData, 30);
+                    }
+                  }
+                } catch (error) {
+                  console.error('URL UUID 데이터 로드 실패:', error);
+                }
+                
+                return urlUuid;
+              }
+              
+              // URL에 UUID가 없으면 원래 함수 호출
+              return await originalValidateUserID.apply(this, arguments);
+            };
+          }
+          
+          // 원래의 ensureMyUUID 함수를 오버라이드하여 URL UUID 처리 개선
+          const originalEnsureMyUUID = window.ensureMyUUID;
+          
+          if (typeof originalEnsureMyUUID === 'function') {
+            window.ensureMyUUID = async function() {
+              // URL에서 UUID 확인 (최우선)
+              const urlUuid = getUuidFromUrl();
+              
+              if (urlUuid) {
+                console.log('ensureMyUUID: URL에서 UUID 사용:', urlUuid);
+                return urlUuid;
+              }
+              
+              // URL에 UUID가 없으면 원래 함수 호출
+              return await originalEnsureMyUUID.apply(this, arguments);
+            };
+          }
         })();
       </script>
                
