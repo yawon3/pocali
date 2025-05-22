@@ -976,7 +976,7 @@
               showById();
             }
           }
-          // 안전한 파일 정보 파싱 함수
+          // Google Cloud Storage URL 구조에 맞춘 안전한 파일 정보 파싱 함수
           function parseImageInfo(imageData) {
             let result = {
               subFolder: '',
@@ -998,84 +998,91 @@
               if (imageData.unique_id) result.uniqueId = imageData.unique_id;
               if (imageData.file_type) result.subFolder = imageData.file_type;
 
-              // URL이 있고 Firebase Storage URL인 경우에만 파싱 시도
-              if (imageData.url && typeof imageData.url === 'string' && imageData.url.includes('firebasestorage')) {
+              // URL이 있는 경우 파싱 시도
+              if (imageData.url && typeof imageData.url === 'string') {
                 try {
-                  // URL에서 인코딩된 파일 경로 추출
-                  const urlParts = imageData.url.split('/o/');
-                  if (urlParts.length < 2) {
-                    console.warn('예상과 다른 URL 구조:', imageData.url);
-                    return result;
-                  }
-
-                  const pathWithParams = urlParts[1];
-                  if (!pathWithParams) {
-                    console.warn('파일 경로 부분을 찾을 수 없음:', imageData.url);
-                    return result;
-                  }
-
-                  // 쿼리 파라미터 제거
-                  const pathPart = pathWithParams.split('?')[0];
-                  if (!pathPart) {
-                    console.warn('파일 경로가 비어있음:', imageData.url);
-                    return result;
-                  }
-
-                  // URL 디코딩
-                  const decodedPath = decodeURIComponent(pathPart);
+                  let pathPart = '';
                   
-                  // 경로 분해 (예: 'images/event/IVE_AN_ARENA_351623.jpg')
-                  const pathParts = decodedPath.split('/');
-                  
-                  // 하위폴더 추출 (일반적으로 두 번째 부분)
-                  if (pathParts.length >= 2 && !result.subFolder) {
-                    result.subFolder = pathParts[1];
-                  }
-                  
-                  // 파일명 추출 (마지막 경로 부분)
-                  if (pathParts.length > 0) {
-                    const fileName = pathParts[pathParts.length - 1];
+                  // Google Cloud Storage URL 구조 처리
+                  // 예: https://storage.googleapis.com/pocali.firebasestorage.app/images/event/IVE_AN_ARENA_351631.jpg
+                  if (imageData.url.includes('storage.googleapis.com')) {
+                    const urlObj = new URL(imageData.url);
+                    pathPart = urlObj.pathname; // "/images/event/IVE_AN_ARENA_351631.jpg"
                     
-                    if (fileName && fileName.includes('_')) {
-                      // 파일명 파싱 (IVE_AN_ARENA_351623.jpg -> 그룹, 멤버, 카테고리 등)
-                      const fileParts = fileName.split('_');
+                    // 맨 앞의 "/" 제거
+                    if (pathPart.startsWith('/')) {
+                      pathPart = pathPart.substring(1);
+                    }
+                  }
+                  // 기존 Firebase Storage URL 구조 처리 (하위 호환성)
+                  else if (imageData.url.includes('firebasestorage.googleapis.com')) {
+                    const urlParts = imageData.url.split('/o/');
+                    if (urlParts.length >= 2) {
+                      const pathWithParams = urlParts[1];
+                      const pathOnly = pathWithParams.split('?')[0];
+                      pathPart = decodeURIComponent(pathOnly);
+                    }
+                  }
+                  
+                  if (pathPart) {
+                    console.log('파싱할 경로:', pathPart); // 디버깅용
+                    
+                    // 경로 분해 (예: 'images/event/IVE_AN_ARENA_351631.jpg')
+                    const pathParts = pathPart.split('/');
+                    console.log('경로 부분들:', pathParts); // 디버깅용
+                    
+                    // 하위폴더 추출 (두 번째 부분: event, benefit 등)
+                    if (pathParts.length >= 2 && !result.subFolder) {
+                      result.subFolder = pathParts[1]; // 'event', 'benefit' 등
+                    }
+                    
+                    // 파일명 추출 (마지막 경로 부분)
+                    if (pathParts.length > 0) {
+                      const fileName = pathParts[pathParts.length - 1];
+                      console.log('파일명:', fileName); // 디버깅용
                       
-                      if (fileParts.length >= 3) {
-                        // 첫 번째 부분은 그룹명
-                        if (!result.group && fileParts[0]) {
-                          result.group = fileParts[0];
-                        }
+                      if (fileName && fileName.includes('_')) {
+                        // 파일명 파싱 (IVE_AN_ARENA_351631.jpg -> 그룹, 멤버, 카테고리 등)
+                        const fileParts = fileName.split('_');
+                        console.log('파일명 부분들:', fileParts); // 디버깅용
                         
-                        // 두 번째 부분은 멤버 코드 (매핑 필요)
-                        if (!result.member && fileParts[1]) {
-                          const memberMap = {
-                            'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
-                            'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
-                          };
-                          result.member = memberMap[fileParts[1]] || fileParts[1];
-                        }
-                        
-                        // 세 번째 부분은 카테고리
-                        if (!result.category && fileParts[2]) {
-                          result.category = fileParts[2];
-                        }
-                        
-                        // 네 번째 이상은 title이나 version 등일 수 있음
-                        if (fileParts.length > 3 && !result.title && fileParts[3]) {
-                          result.title = fileParts[3];
-                        }
-                        
-                        if (fileParts.length > 4 && !result.version && fileParts[4]) {
-                          result.version = fileParts[4];
-                        }
-                        
-                        // 마지막 부분에서 숫자만 추출 (고유 ID)
-                        if (!result.uniqueId && fileParts.length > 0) {
-                          const lastPart = fileParts[fileParts.length - 1];
-                          if (lastPart) {
-                            const idMatch = lastPart.match(/\d+/);
-                            if (idMatch) {
-                              result.uniqueId = idMatch[0];
+                        if (fileParts.length >= 3) {
+                          // 첫 번째 부분은 그룹명
+                          if (!result.group && fileParts[0]) {
+                            result.group = fileParts[0];
+                          }
+                          
+                          // 두 번째 부분은 멤버 코드 (매핑 필요)
+                          if (!result.member && fileParts[1]) {
+                            const memberMap = {
+                              'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
+                              'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
+                            };
+                            result.member = memberMap[fileParts[1]] || fileParts[1];
+                          }
+                          
+                          // 세 번째 부분은 카테고리
+                          if (!result.category && fileParts[2]) {
+                            result.category = fileParts[2];
+                          }
+                          
+                          // 네 번째 이상은 title이나 version 등일 수 있음
+                          if (fileParts.length > 3 && !result.title && fileParts[3]) {
+                            result.title = fileParts[3];
+                          }
+                          
+                          if (fileParts.length > 4 && !result.version && fileParts[4]) {
+                            result.version = fileParts[4];
+                          }
+                          
+                          // 마지막 부분에서 숫자만 추출 (고유 ID)
+                          if (!result.uniqueId && fileParts.length > 0) {
+                            const lastPart = fileParts[fileParts.length - 1];
+                            if (lastPart) {
+                              const idMatch = lastPart.match(/\d+/);
+                              if (idMatch) {
+                                result.uniqueId = idMatch[0];
+                              }
                             }
                           }
                         }
@@ -1093,6 +1100,8 @@
               if (!result.category) result.category = 'Unknown';
               if (!result.uniqueId) result.uniqueId = Math.random().toString(36).substr(2, 9);
               if (!result.subFolder) result.subFolder = 'default';
+
+              console.log('파싱 결과:', result); // 디버깅용
 
             } catch (error) {
               console.error('파일 정보 파싱 중 전체 오류:', error, imageData);
@@ -1121,6 +1130,7 @@
               }
               
               let data = await resp.json();
+              console.log('서버에서 받은 원본 데이터 샘플:', data[0]); // 디버깅용
               
               // 데이터 처리 - 각 이미지에 필수 필드 보장
               allImages = data.map(imageData => {
@@ -1139,6 +1149,8 @@
                   file_type: parsed.subFolder
                 };
               });
+              
+              console.log('파싱 완료된 데이터 샘플:', allImages[0]); // 디버깅용
               
               // 백업 저장
               backupAllImages = allImages.slice();
@@ -1177,13 +1189,19 @@
               const container = document.createElement('div');
               container.className = 'photo-card-container';
               
-              // 2) 안전한 파일 정보 파싱
-              const parsed = parseImageInfo(image);
+              // 2) 이미 파싱된 데이터 사용 (fetchAndRenderImages에서 파싱 완료)
+              const subFolder = image.file_type || 'default';
+              const group = image.group || 'Unknown';
+              const member = image.member || 'Unknown';
+              const category = image.category || 'Unknown';
+              const title = image.title || '';
+              const version = image.version || '';
+              const uniqueId = image.unique_id || Math.random().toString(36).substr(2, 9);
               
               // 3) 오버레이 생성
               const overlay = document.createElement('div');
               overlay.className = 'image-overlay';
-              overlay.textContent = parsed.subFolder;
+              overlay.textContent = subFolder;
               container.appendChild(overlay);
               
               // 4) 이미지 요소 생성
@@ -1192,19 +1210,19 @@
               img.src = image.url || '';
               img.loading = 'lazy';
               
-              // 데이터셋 설정 (모달 표시에 사용)
-              img.dataset.group = parsed.group;
-              img.dataset.member = parsed.member;
-              img.dataset.category = parsed.category;
-              img.dataset.title = parsed.title;
-              img.dataset.version = parsed.version;
-              img.dataset.unique = parsed.uniqueId;
+              // 데이터셋 설정 (모달 표시에 사용) - 파싱된 데이터 사용
+              img.dataset.group = group;
+              img.dataset.member = member;
+              img.dataset.category = category;
+              img.dataset.title = title;
+              img.dataset.version = version;
+              img.dataset.unique = uniqueId;
               
               // alt 태그 설정 (검색에 사용)
-              img.alt = `${parsed.group} ${parsed.member} ${parsed.category} ${parsed.title} #${parsed.uniqueId}`;
+              img.alt = `${group} ${member} ${category} ${title} #${uniqueId}`;
               
               // 체크 상태 설정
-              if (userData[parsed.uniqueId]) {
+              if (userData[uniqueId]) {
                 img.classList.add('checked');
               }
               
@@ -1281,6 +1299,11 @@
             
             isRendering = false;
           }
+
+
+
+
+
 
           // 서버에서 데이터 가져오기 (10초마다 폴링)
           async function pollServerData() {
