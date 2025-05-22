@@ -153,33 +153,34 @@
             </ul>
             </div>
         </div>
-        <!-- 로딩 화면 수정 부분 - Firebase Storage 이미지로 교체 -->
+        <!-- 로딩 화면 수정 부분 -->
         <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
         background-color: #f8f9fa; 
         display: flex; flex-direction: column; 
         align-items: center; justify-content: center; z-index: 9999; overflow: hidden;">
         
-        <!-- 배경 카드 효과 - Firebase Storage URL로 변경 -->
+        <!-- 배경 카드 효과 -->
+        <!-- 배경 카드 위치 조정 - 모바일에서도 분산되도록 -->
         <div class="background-card" style="position: absolute; width: 150px; height: 210px; 
-        background-image: url('https://firebasestorage.googleapis.com/v0/b/pocali.firebasestorage.app/o/images%2Fevent%2FIVE_AN_ARENA_351623.jpg?alt=media&token=8946eed9-55b7-422b-af30-f9249f684696');
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747290046/특전/IVE_AN_IE_yizhiyu_2.0_351504.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         top: 15%; left: 10%; transform: rotate(-8deg); z-index: -1;"></div>
       
         <div class="background-card" style="position: absolute; width: 150px; height: 210px; 
-        background-image: url('https://firebasestorage.googleapis.com/v0/b/pocali.firebasestorage.app/o/images%2Fevent%2FIVE_AN_ARENA_351624.jpg?alt=media&token=90ecd86b-5618-4f6d-bf9d-41aa415bd85b');
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296186/event/IVE_WON_dashingdiva_351616.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         top: 25%; right: 10%; transform: rotate(12deg); z-index: -1;"></div>
       
         <div class="background-card" style="position: absolute; width: 120px; height: 180px; 
-        background-image: url('https://firebasestorage.googleapis.com/v0/b/pocali.firebasestorage.app/o/images%2Fevent%2FIVE_AN_ARENA_351629.jpg?alt=media&token=c4524501-6622-46e6-9616-02b122f37b4d');
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296129/event/IVE_AN_pepsi_winner_289545.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         bottom: 20%; left: 15%; transform: rotate(5deg); z-index: -1;"></div>
       
         <div class="background-card" style="position: absolute; width: 135px; height: 190px; 
-        background-image: url('https://firebasestorage.googleapis.com/v0/b/pocali.firebasestorage.app/o/images%2Fevent%2FIVE_AN_ARENA_351631.jpg?alt=media&token=6c3625da-57ab-4206-a4c7-d9a9b2a71669g');
+        background-image: url('https://res.cloudinary.com/dobylqohm/image/upload/v1747296171/event/IVE_WON_innisfree_351611.jpg');
         background-size: cover; background-position: center;
         border-radius: 8px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
         bottom: 15%; right: 15%; transform: rotate(-15deg); z-index: -1;"></div>
@@ -233,7 +234,7 @@
         // 🔥 자동 숨김 스크립트
         document.addEventListener('DOMContentLoaded', () => {
         // ⏰ 여기서 시간 변경 (밀리초 단위)
-        const LOADING_TIME = 5000; // 5초 (원하는 시간으로 변경)
+        const LOADING_TIME = 8000; // 8초 (원하는 시간으로 변경)
 
         setTimeout(() => {
         const loadingScreen = document.getElementById('loading-screen');
@@ -977,194 +978,7 @@
             }
           }
 
-
-          // Google Cloud Storage URL 구조에 맞춘 정확한 파일 정보 파싱 함수 (한 번만 정의)
-          function parseImageInfo(imageData) {
-            let result = {
-              subFolder: '',
-              group: '',
-              member: '',
-              category: '',
-              title: '',
-              version: '',
-              uniqueId: ''
-            };
-
-            try {
-              // API에서 이미 파싱된 데이터가 있는 경우 우선 사용
-              if (imageData.group) result.group = imageData.group;
-              if (imageData.member) result.member = imageData.member;
-              if (imageData.category) result.category = imageData.category;
-              if (imageData.title) result.title = imageData.title;
-              if (imageData.version) result.version = imageData.version;
-              if (imageData.unique_id) result.uniqueId = imageData.unique_id;
-              if (imageData.file_type) result.subFolder = imageData.file_type;
-
-              // URL이 있는 경우 파싱 시도
-              if (imageData.url && typeof imageData.url === 'string') {
-                try {
-                  let filePath = '';
-                  
-                  // Google Cloud Storage URL 구조 처리
-                  // 예: https://storage.googleapis.com/pocali.firebasestorage.app/images/album/IVE_AN_EL_Ver.2_36618.jpg
-                  if (imageData.url.includes('storage.googleapis.com')) {
-                    // URL을 '/' 기준으로 분할
-                    const urlParts = imageData.url.split('/');
-                    
-                    // storage.googleapis.com 이후의 버킷명을 찾고, 그 다음부터가 실제 파일 경로
-                    const storageIndex = urlParts.findIndex(part => part === 'storage.googleapis.com');
-                    if (storageIndex !== -1 && urlParts.length > storageIndex + 2) {
-                      // storage.googleapis.com 다음이 버킷명, 그 다음부터가 파일 경로
-                      const pathParts = urlParts.slice(storageIndex + 2); // 버킷명 이후의 모든 부분
-                      filePath = pathParts.join('/'); // 'images/album/IVE_AN_EL_Ver.2_36618.jpg'
-                    }
-                  }
-                  // 기존 Firebase Storage URL 구조 처리 (하위 호환성)
-                  else if (imageData.url.includes('firebasestorage.googleapis.com')) {
-                    const urlParts = imageData.url.split('/o/');
-                    if (urlParts.length >= 2) {
-                      const pathWithParams = urlParts[1];
-                      const pathOnly = pathWithParams.split('?')[0];
-                      filePath = decodeURIComponent(pathOnly);
-                    }
-                  }
-                  
-                  if (filePath) {
-                    // 경로 분해 (예: 'images/album/IVE_AN_EL_Ver.2_36618.jpg')
-                    const pathParts = filePath.split('/');
-                    
-                    // 하위폴더 추출 (두 번째 부분: album, event, benefit 등)
-                    // 첫 번째는 'images', 두 번째가 실제 카테고리
-                    if (pathParts.length >= 2 && !result.subFolder) {
-                      result.subFolder = pathParts[1]; // 'album', 'event', 'benefit' 등
-                    }
-                    
-                    // 파일명 추출 (마지막 경로 부분)
-                    if (pathParts.length > 0) {
-                      const fileName = pathParts[pathParts.length - 1];
-                      
-                      if (fileName && fileName.includes('_')) {
-                        // 파일명 파싱 (IVE_AN_EL_Ver.2_36618.jpg -> 그룹, 멤버, 카테고리 등)
-                        const fileParts = fileName.split('_');
-                        
-                        if (fileParts.length >= 3) {
-                          // 첫 번째 부분은 그룹명
-                          if (!result.group && fileParts[0]) {
-                            result.group = fileParts[0]; // 'IVE'만 저장
-                          }
-                          
-                          // 두 번째 부분은 멤버 코드 (매핑 필요)
-                          if (!result.member && fileParts[1]) {
-                            const memberMap = {
-                              'AN': '유진', 'WON': '원영', 'GA': '가을', 'REI': '레이',
-                              'LIZ': '리즈', 'LEE': '이서', 'II': "I've IVE"
-                            };
-                            result.member = memberMap[fileParts[1]] || fileParts[1];
-                          }
-                          
-                          // 세 번째 부분은 카테고리
-                          if (!result.category && fileParts[2]) {
-                            result.category = fileParts[2];
-                          }
-                          
-                          // 네 번째 이상은 title이나 version 등일 수 있음
-                          if (fileParts.length > 3 && !result.title && fileParts[3]) {
-                            result.title = fileParts[3];
-                          }
-                          
-                          if (fileParts.length > 4 && !result.version && fileParts[4]) {
-                            result.version = fileParts[4];
-                          }
-                          
-                          // 마지막 부분에서 숫자만 추출 (고유 ID)
-                          if (!result.uniqueId && fileParts.length > 0) {
-                            const lastPart = fileParts[fileParts.length - 1];
-                            if (lastPart) {
-                              const idMatch = lastPart.match(/\d+/);
-                              if (idMatch) {
-                                result.uniqueId = idMatch[0];
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                } catch (urlParsingError) {
-                  console.warn('URL 파싱 중 오류:', urlParsingError);
-                }
-              }
-
-              // 기본값 설정
-              if (!result.group) result.group = 'Unknown';
-              if (!result.member) result.member = 'Unknown';
-              if (!result.category) result.category = 'Unknown';
-              if (!result.uniqueId) result.uniqueId = Math.random().toString(36).substr(2, 9);
-              if (!result.subFolder) result.subFolder = 'default';
-
-            } catch (error) {
-              console.error('파일 정보 파싱 중 전체 오류:', error);
-              // 모든 파싱이 실패한 경우 기본값 반환
-              return {
-                subFolder: 'error',
-                group: 'Unknown',
-                member: 'Unknown', 
-                category: 'Unknown',
-                title: '',
-                version: '',
-                uniqueId: Math.random().toString(36).substr(2, 9)
-              };
-            }
-
-            return result;
-          }
-
-          // fetchAndRenderImages 함수 수정 (로그 제거, 중복 파싱 함수 제거)
-          async function fetchAndRenderImages() {
-            try {
-              const resp = await fetch('https://pocali-backend.onrender.com/api/images');
-              
-              if (!resp.ok) {
-                throw new Error('이미지를 불러오는데 실패했습니다');
-              }
-              
-              let data = await resp.json();
-              
-              // 데이터 처리 - 각 이미지에 필수 필드 보장
-              allImages = data.map(imageData => {
-                // 안전한 파싱 함수 사용
-                const parsed = parseImageInfo(imageData);
-                
-                // 원본 데이터와 파싱된 데이터 병합
-                return {
-                  ...imageData,
-                  group: parsed.group,
-                  member: parsed.member,
-                  category: parsed.category,
-                  title: parsed.title,
-                  version: parsed.version,
-                  unique_id: parsed.uniqueId,
-                  file_type: parsed.subFolder
-                };
-              });
-              
-              // 백업 저장
-              backupAllImages = allImages.slice();
-              totalCount = allImages.length;
-              
-              // 렌더링 초기화
-              currentBatch = 0;
-              $grid.innerHTML = '';
-              
-              // 첫 배치 렌더링
-              renderNextBatch();
-            } catch (error) {
-              console.error('이미지 로드 오류:', error);
-              alert('이미지를 불러오는 중 오류가 발생했습니다.');
-            }
-          }
-
-          // renderNextBatch 함수 수정 (로그 제거, 파싱 로직 간소화)
+          // ─── 페이징별 렌더링 함수 ─────────────────────────
           function renderNextBatch() {
             if (isRendering) return;
             
@@ -1184,48 +998,37 @@
               // 1) 카드 컨테이너 생성
               const container = document.createElement('div');
               container.className = 'photo-card-container';
-              
-              // 2) 이미 파싱된 데이터 사용 (fetchAndRenderImages에서 파싱 완료)
-              const subFolder = image.file_type || 'default';
-              const group = image.group || 'Unknown';
-              const member = image.member || 'Unknown';
-              const category = image.category || 'Unknown';
-              const title = image.title || '';
-              const version = image.version || '';
-              const uniqueId = image.unique_id || Math.random().toString(36).substr(2, 9);
-              
-              // 3) 오버레이 생성
-              const overlay = document.createElement('div');
-              overlay.className = 'image-overlay';
-              overlay.textContent = subFolder;
-              container.appendChild(overlay);
-              
-              // 4) 이미지 요소 생성
+
+              // 2) <img> 요소 생성
               const img = document.createElement('img');
               img.className = 'photo-card';
-              img.src = image.url || '';
+              img.src = image.url.startsWith('http')
+                        ? image.url
+                        : `https://pocali-backend.onrender.com${image.url}`;
               img.loading = 'lazy';
-              
-              // 데이터셋 설정 (모달 표시에 사용) - 파싱된 데이터 사용
-              img.dataset.group = group;
-              img.dataset.member = member;
-              img.dataset.category = category;
-              img.dataset.title = title;
-              img.dataset.version = version;
-              img.dataset.unique = uniqueId;
-              
-              // alt 태그 설정 (검색에 사용)
-              img.alt = `${group} ${member} ${category} ${title} #${uniqueId}`;
-              
-              // 체크 상태 설정
-              if (userData[uniqueId]) {
+              img.alt = `${image.group} ${image.member} ${image.category} ${image.title} #${image.unique_id}`;
+              img.dataset.group = image.group;
+              img.dataset.member = image.member;
+              img.dataset.category = image.category;
+              img.dataset.title = image.title;
+              img.dataset.version = image.version;
+              img.dataset.unique = image.unique_id;
+
+              // ── 현재 userData에 따른 체크 정보 적용
+              if (userData[image.unique_id]) {
                 img.classList.add('checked');
               }
-              
+
               // 포인터 이벤트 설정
               img.style.pointerEvents = viewOwner === 'self' ? '' : 'none';
-              
-              // 5) 이벤트 핸들러 등록 (기존과 동일)
+
+              // 3) 오버레이: image.type 또는 백엔드 file_type 활용
+              const overlay = document.createElement('div');
+              overlay.className = 'image-overlay';
+              overlay.textContent = image.type || image.file_type || '';
+              container.appendChild(overlay);
+
+              // 4) 터치·롱프레스 & 더블클릭 이벤트 바인딩
               let startX, startY;
               let moved = false;
               let startTime, pressTimer;
@@ -1233,6 +1036,7 @@
               img.addEventListener('pointerdown', e => {
                 if (viewOwner !== 'self') return;
                 
+                // 시작 위치 기록
                 startX = e.clientX;
                 startY = e.clientY;
                 moved = false;
@@ -1244,22 +1048,26 @@
               img.addEventListener('pointermove', e => {
                 if (!startX || !startY) return;
                 
+                // 움직인 거리 계산
                 const deltaX = Math.abs(e.clientX - startX);
                 const deltaY = Math.abs(e.clientY - startY);
                 
+                // 일정 거리 이상 움직였으면 스크롤로 간주
                 if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
                   moved = true;
-                  clearTimeout(pressTimer);
+                  clearTimeout(pressTimer); // 롱프레스 타이머 취소
                 }
               });
 
               img.addEventListener('pointerup', e => {
                 clearTimeout(pressTimer);
                 
+                // 스크롤이 아닌 짧은 탭인 경우에만 토글
                 if (!moved && (performance.now() - startTime < TAP_THRESHOLD)) {
                   toggleCheck(img);
                 }
                 
+                // 변수 초기화
                 startX = startY = null;
                 moved = false;
               });
@@ -1279,25 +1087,22 @@
                 e.preventDefault();
                 showModal(img);
               });
-              
-              // 6) 컨테이너에 이미지 추가 후 그리드에 추가
+
+              // 5) 그리드에 추가
               container.appendChild(img);
               $grid.appendChild(container);
             });
             
-            // 캐시 갱신
+            // — 캐시 갱신
             originalCards = Array.from($grid.querySelectorAll('.photo-card-container'));
             photoCards = Array.from($grid.querySelectorAll('.photo-card'));
-            
-            // 상태 갱신
+
+            // — 상태 갱신
             currentBatch++;
             updateCount();
-            
-            isRendering = false;
+
+            isRendering = false; 
           }
-
-
-          
 
           // 서버에서 데이터 가져오기 (10초마다 폴링)
           async function pollServerData() {
@@ -2137,6 +1942,8 @@
             };
           }
         })();
+
+
       </script>
                
       </body>
