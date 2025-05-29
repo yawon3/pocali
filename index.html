@@ -716,18 +716,31 @@
           }
         }
 
-        // load-other-data 핸들러 세팅
+        // load-other-data 핸들러 세팅 (잠금 체크 포함)
         function setupLoadOtherDataHandler() {
-          $('#load-other-data')?.addEventListener('click', async () => {
-            const other = $('#other-uuid').value.trim();
-            if (!isValidUUID(other)) {
+          const loadBtn = document.getElementById('load-other-data');
+          if (!loadBtn) return;
+          
+          loadBtn.addEventListener('click', async () => {
+            const otherUUID = document.getElementById('other-uuid').value.trim();
+            if (!isValidUUID(otherUUID)) {
               return alert('유효한 UUID를 입력하세요!');
             }
             
             try {
-              const response = await fetch(`https://pocali-backend.onrender.com/api/user/${other}`);
+              const response = await fetch(`https://pocali-backend.onrender.com/api/user/${otherUUID}`);
+              
               if (!response.ok) {
-                return alert('해당 UUID를 찾을 수 없습니다.');
+                const errorData = await response.json();
+                
+                // 잠금된 사용자인 경우
+                if (response.status === 403 && errorData.locked) {
+                  alert('🔒 이 사용자는 UUID를 잠갔습니다.\n다른 사람이 데이터를 불러올 수 없습니다.');
+                  return;
+                }
+                
+                alert('해당 UUID를 찾을 수 없습니다.');
+                return;
               }
               
               const json = await response.json();
@@ -745,7 +758,7 @@
               }
               
               // 모든 저장소에 저장
-              await saveUserData('myUUID', other);
+              await saveUserData('myUUID', otherUUID);
               await saveUserData('userData', JSON.stringify(userDataObj));
               
               location.reload();
@@ -755,11 +768,18 @@
             }
           });
         }
+        
+
+
+
+
+
 
         /* ───────────────────────────────────────────────
           0. 전역 상태 및 도우미
           ─────────────────────────────────────────────── */
         // ─── 페이징용 전역 변수 ─────────────────────────
+        let currentLockStatus = false;  // ← 이것만 추가
         const BATCH_SIZE   = 100;      // 한 번에 로드할 카드 개수
         let backupAllImages = [];      // allImages 원본 백업용
         let allImages      = [];       // 전체 이미지 메타데이터 저장
@@ -770,6 +790,8 @@
         let viewOwner      = 'self';   // 'self'| 'friend'
         let currentFriendUUID = null;  // 초기화: DOMContentLoaded에서 설정됨
         let userData       = {};       // 현재 보여지는 데이터 (내 것 또는 친구 것)
+        
+
 
         const advancedFilters = { groups: [], members: [] };
 
@@ -795,43 +817,186 @@
 
           $modal.style.display = 'block';
         }
-
-        // 앱 초기화 시 실행할 함수
-        async function initApp() {
+        
+        // ═══════════════════════════════════════
+        // UUID 잠금 기능 추가 (4개 함수)
+        // ═══════════════════════════════════════
+        
+        // UUID 잠금 상태 확인
+        async function checkLockStatus() {
           try {
-            // IndexedDB 초기화
+            const myUUID = await getMyUUID();
+            if (!myUUID) return false;
+            
+            const response = await fetch(`https://pocali-backend.onrender.com/api/user/${myUUID}/lock-status`);
+            if (response.ok) {
+              const data = await response.json();
+              currentLockStatus = data.locked;
+              updateLockIcon();
+              return data.locked;
+            }
+          } catch (error) {
+            console.error('잠금 상태 확인 오류:', error);
+          }
+          return false;
+        }
+
+        // UUID 잠금 토글
+        async function toggleLock() {
+          try {
+            const myUUID = await getMyUUID();
+            if (!myUUID) {
+              alert('UUID를 먼저 확인해주세요.');
+              return;
+            }
+            
+            const response = await fetch(`https://pocali-backend.onrender.com/api/user/${myUUID}/toggle-lock`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ current_user: myUUID })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              currentLockStatus = data.locked;
+              updateLockIcon();
+              
+              // 사용자에게 상태 알림
+              const message = data.locked ? 
+                '🔒 UUID가 잠겼습니다. 다른 사람이 내 데이터를 불러올 수 없습니다.' :
+                '🔓 UUID 잠금이 해제되었습니다.';
+              
+              // 임시 토스트 메시지 (3초 후 사라짐)
+              showToast(message);
+              
+            } else {
+              const errorData = await response.json();
+              alert(`잠금 설정 실패: ${errorData.error}`);
+            }
+          } catch (error) {
+            console.error('잠금 토글 오류:', error);
+            alert('잠금 설정 중 오류가 발생했습니다.');
+          }
+        }
+
+        // 잠금 상태 아이콘 업데이트
+        function updateLockIcon() {
+          const fab = document.getElementById('fab');
+          if (fab) {
+            // + 버튼 텍스트를 잠금 상태에 따라 변경
+            fab.innerHTML = currentLockStatus ? '🔒' : '+';
+            fab.title = currentLockStatus ? 
+              'UUID 잠금됨 (클릭하여 해제)' : 
+              'UUID 잠금 해제됨 (클릭하여 잠금)';
+            
+            // 잠금 상태에 따른 스타일 변경
+            if (currentLockStatus) {
+              fab.style.backgroundColor = '#e74c3c'; // 빨간색 (잠금)
+            } else {
+              fab.style.backgroundColor = '#3498db'; // 기본 파란색
+            }
+          }
+        }
+
+        // 토스트 메시지 표시
+        function showToast(message) {
+          // 기존 토스트가 있으면 제거
+          const existingToast = document.getElementById('toast-message');
+          if (existingToast) {
+            existingToast.remove();
+          }
+          
+          // 새 토스트 생성
+          const toast = document.createElement('div');
+          toast.id = 'toast-message';
+          toast.textContent = message;
+          toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 10000;
+            animation: fadeInOut 3s ease-in-out;
+          `;
+          
+          // 애니메이션 CSS 추가
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes fadeInOut {
+              0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+              15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+              85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+              100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            }
+          `;
+          document.head.appendChild(style);
+          
+          document.body.appendChild(toast);
+          
+          // 3초 후 제거
+          setTimeout(() => {
+            if (toast && toast.parentNode) {
+              toast.remove();
+            }
+            if (style && style.parentNode) {
+              style.remove();
+            }
+          }, 3000);
+        }
+
+        // ═══════════════════════════════════════
+        // 여기까지 추가 완료!
+        // ═══════════════════════════════════════
+
+        
+        // 앱 초기화 시 실행할 함수 (잠금 기능 포함)
+        async function initAppWithLock() {
+          try {
+            // 기존 initApp 로직...
             await initIndexedDB();
             
-            // 친구 UUID 복구
             const friendUUID = await getLastFriendUUID();
             if (friendUUID) {
               currentFriendUUID = friendUUID;
               console.log('복구된 친구 UUID:', currentFriendUUID);
             }
             
-            // UUID 검증 및 복구
             const uuid = await validateUserID();
             console.log('검증된 UUID:', uuid);
             
             if (uuid) {
-              // userData 로드
               const userDataObj = await getUserDataObj();
               userData = userDataObj;
+              
+              // 잠금 상태 확인 추가
+              await checkLockStatus();
             }
             
-            // load-other-data 핸들러 설정
             setupLoadOtherDataHandler();
+            setupFabButton(); // FAB 버튼 설정 추가
+            
           } catch (error) {
             console.error('앱 초기화 오류:', error);
           }
         }
+       
+
+
+
+
+
 
         /* ───────────────────────────────────────────────
           1. 초기화 및 메인 기능들
           ─────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', () => {
           // 앱 초기화
-          initApp();
+          initAppWithLock();  // ← initApp()을 initAppWithLock()으로 변경!
           
           // ── export-modal 닫기 핸들러
           const $exportModal      = document.getElementById('export-modal');
@@ -1370,7 +1535,44 @@
           });
 
           // FAB 모달
-          $fab.addEventListener('click', () => $userModal.style.display = 'block');
+          // FAB 버튼 이벤트 수정 (잠금 토글 + 더블클릭 모달)
+          function setupFabButton() {
+            const fab = document.getElementById('fab');
+            const userModal = document.getElementById('user-modal');
+            
+            if (!fab || !userModal) return;
+            
+            // 기존 이벤트 리스너 제거 후 새로 추가
+            fab.replaceWith(fab.cloneNode(true));
+            const newFab = document.getElementById('fab');
+            
+            let clickCount = 0;
+            let clickTimer = null;
+            
+            newFab.addEventListener('click', (e) => {
+              clickCount++;
+              
+              if (clickCount === 1) {
+                // 첫 번째 클릭 - 200ms 대기
+                clickTimer = setTimeout(() => {
+                  // 단일 클릭: 잠금 토글
+                  toggleLock();
+                  clickCount = 0;
+                }, 200);
+              } else if (clickCount === 2) {
+                // 두 번째 클릭: 더블클릭
+                clearTimeout(clickTimer);
+                // 더블클릭: 기존 유저 모달 열기
+                userModal.style.display = 'block';
+                clickCount = 0;
+              }
+            });
+          }
+
+          // setupFabButton 호출
+          setupFabButton();
+
+
           $userModalClose.addEventListener('click', () => $userModal.style.display = 'none');
           $userModal.addEventListener('click', e => {
             if (e.target === $userModal) $userModal.style.display = 'none';
