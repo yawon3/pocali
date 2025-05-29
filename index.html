@@ -150,6 +150,7 @@
                 <li><button id="reset-checks">체크 상태 초기화</button></li>
                 <li><button id="export-sheet">이미지 시트 출력</button></li>
                 <li><button id="add-friend">친구 추가</button></li>
+                <li><button id="toggle-lock">🔒 UUID 잠금</button></li>
             </ul>
             </div>
         </div>
@@ -832,7 +833,7 @@
             if (response.ok) {
               const data = await response.json();
               currentLockStatus = data.locked;
-              updateLockIcon();
+              updateLockButtonStyle(); 
               return data.locked;
             }
           } catch (error) {
@@ -859,7 +860,7 @@
             if (response.ok) {
               const data = await response.json();
               currentLockStatus = data.locked;
-              updateLockIcon();
+              updateLockButtonStyle(); // ← updateLockIcon()을 updateLockButtonStyle()로 변경
               
               // 사용자에게 상태 알림
               const message = data.locked ? 
@@ -879,21 +880,20 @@
           }
         }
 
-        // 잠금 상태 아이콘 업데이트
-        function updateLockIcon() {
-          const fab = document.getElementById('fab');
-          if (fab) {
-            // + 버튼 텍스트를 잠금 상태에 따라 변경
-            fab.innerHTML = currentLockStatus ? '🔒' : '+';
-            fab.title = currentLockStatus ? 
-              'UUID 잠금됨 (클릭하여 해제)' : 
-              'UUID 잠금 해제됨 (클릭하여 잠금)';
-            
-            // 잠금 상태에 따른 스타일 변경
+        // 잠금 버튼 스타일 업데이트
+        function updateLockButtonStyle() {
+          const lockBtn = document.getElementById('toggle-lock');
+          if (lockBtn) {
             if (currentLockStatus) {
-              fab.style.backgroundColor = '#e74c3c'; // 빨간색 (잠금)
+              // 잠금 활성화: 검은색 배경 + 흰색 텍스트
+              lockBtn.style.backgroundColor = '#333';
+              lockBtn.style.color = '#fff';
+              lockBtn.textContent = '🔓 UUID 잠금 해제';
             } else {
-              fab.style.backgroundColor = '#3498db'; // 기본 파란색
+              // 잠금 비활성화: 기본 스타일
+              lockBtn.style.backgroundColor = '';
+              lockBtn.style.color = '';
+              lockBtn.textContent = '🔒 UUID 잠금';
             }
           }
         }
@@ -979,6 +979,8 @@
             
             setupLoadOtherDataHandler();
             setupFabButton(); // FAB 버튼 설정 추가
+
+
             
           } catch (error) {
             console.error('앱 초기화 오류:', error);
@@ -1534,43 +1536,9 @@
             $('#user-data-modal').style.display = 'block';
           });
 
-          // FAB 모달
-          // FAB 버튼 이벤트 수정 (잠금 토글 + 더블클릭 모달)
-          function setupFabButton() {
-            const fab = document.getElementById('fab');
-            const userModal = document.getElementById('user-modal');
-            
-            if (!fab || !userModal) return;
-            
-            // 기존 이벤트 리스너 제거 후 새로 추가
-            fab.replaceWith(fab.cloneNode(true));
-            const newFab = document.getElementById('fab');
-            
-            let clickCount = 0;
-            let clickTimer = null;
-            
-            newFab.addEventListener('click', (e) => {
-              clickCount++;
-              
-              if (clickCount === 1) {
-                // 첫 번째 클릭 - 200ms 대기
-                clickTimer = setTimeout(() => {
-                  // 단일 클릭: 잠금 토글
-                  toggleLock();
-                  clickCount = 0;
-                }, 200);
-              } else if (clickCount === 2) {
-                // 두 번째 클릭: 더블클릭
-                clearTimeout(clickTimer);
-                // 더블클릭: 기존 유저 모달 열기
-                userModal.style.display = 'block';
-                clickCount = 0;
-              }
-            });
-          }
-
+          
           // setupFabButton 호출
-          setupFabButton();
+          $fab.addEventListener('click', () => $userModal.style.display = 'block');
 
 
           $userModalClose.addEventListener('click', () => $userModal.style.display = 'none');
@@ -1584,6 +1552,16 @@
             $friendModal.style.display = 'block';
           });
           
+          // UUID 잠금 토글 버튼
+          const $toggleLockBtn = document.getElementById('toggle-lock');
+          $toggleLockBtn?.addEventListener('click', async () => {
+            $userModal.style.display = 'none'; // 모달 닫기
+            await toggleLock(); // 잠금 토글
+            updateLockButtonStyle(); // 버튼 스타일 업데이트
+          });
+
+
+
           $friendClose.addEventListener('click', () => $friendModal.style.display = 'none');
           
           $friendModal.addEventListener('click', e => { 
