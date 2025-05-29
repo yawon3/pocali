@@ -941,9 +941,11 @@
             ───────────────────────────────────────────── */
           /** 현재 화면의 총 카드수 / 보유카드수 표시 */
           function updateCount() {
-            // 현재 보여지는 userData를 기준으로 계산
-            const have = Object.values(userData).filter(v => v).length;
-            document.getElementById('count-display').textContent = `${have} / ${totalCount}`;
+            const totalFiltered = allImages.length;
+            const checkedCount = allImages.filter(meta => 
+              userData[meta.unique_id]
+            ).length;
+            document.getElementById('count-display').textContent = `${checkedCount} / ${totalFiltered}`;
           }
 
           /** 카드 리스트를 그리드에 그대로 렌더링 */
@@ -1221,23 +1223,29 @@
 
           // ✅ 검색 이벤트 핸들러
           $searchInput.addEventListener('input', e => {
-            const q = e.target.value.trim().toLowerCase();
-            if (!q) {
-              allImages = backupAllImages.slice();
-            } else {
-              allImages = backupAllImages.filter(meta =>
-                (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
-                  .toLowerCase().includes(q)
-              );
-            }
-            // 페이징 초기화 후 다시 렌더
-            currentBatch = 0;
-            isRendering = false;
-            $grid.innerHTML = '';
-            renderNextBatch();
-            // 첫 배치 렌더링 후 현재 뷰 적용
-            setTimeout(() => applyFilters(), 100);
-          });
+          const q = e.target.value.trim().toLowerCase();
+          if (!q) {
+            allImages = backupAllImages.slice();
+          } else {
+            allImages = backupAllImages.filter(meta =>
+              (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
+                .toLowerCase().includes(q)
+            );
+          }
+          // 페이징 초기화 후 다시 렌더
+          currentBatch = 0;
+          isRendering = false;
+          $grid.innerHTML = '';
+          
+          // ✅ 이 줄을 추가하세요
+          updateCount();
+          
+          renderNextBatch();
+          // 첫 배치 렌더링 후 현재 뷰 적용
+          setTimeout(() => {
+            applyFilters();
+          }, 100);
+        });
 
           // ─── 무한 스크롤 트리거 ─────────────────────────
           window.addEventListener('scroll', () => {
@@ -1303,11 +1311,14 @@
             currentBatch = 0;
             isRendering = false;
             $grid.innerHTML = '';
+            updateCount();
+  
             renderNextBatch();
-            setTimeout(() => applyFilters(), 100);
+            setTimeout(() => {
+              applyFilters();
+            }, 100);
             detailModal.style.display = 'none';
           });
-
           // Export form
           const $exportForm = document.getElementById('export-form');
           $exportForm.addEventListener('submit', e => {
