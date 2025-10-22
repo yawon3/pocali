@@ -1633,7 +1633,8 @@
             $('#export-modal').style.display = 'block';
           });
 
-          // 시트 생성 함수
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 시트 생성 함수
           function generateImageSheet(nodes) {
             // ① 오버레이 생성
             const overlay = document.createElement('div');
@@ -1677,15 +1678,30 @@
                 
                 // 모든 이미지가 로드될 때까지 기다림
                 const images = Array.from(sheetGrid.querySelectorAll('img'));
-                await Promise.all(images.map(img => {
-                  // 이미 로드된 이미지는 즉시 해결
-                  if (img.complete) return Promise.resolve();
-                  // 아직 로드되지 않은 이미지는 로드 이벤트 기다림
-                  return new Promise(resolve => {
-                    img.onload = resolve;
-                    img.onerror = resolve; // 에러가 나도 진행
+                
+                status.textContent = `이미지 로딩 중... (0/${images.length})`;
+                
+                // ✅ 각 이미지의 로딩 상태를 Promise로 관리
+                const loadPromises = images.map((img, index) => {
+                  return new Promise((resolve) => {
+                    if (img.complete && img.naturalHeight !== 0) {
+                      status.textContent = `이미지 로딩 중... (${index + 1}/${images.length})`;
+                      resolve();
+                    } else {
+                      img.onload = () => {
+                        status.textContent = `이미지 로딩 중... (${index + 1}/${images.length})`;
+                        resolve();
+                      };
+                      img.onerror = () => {
+                        console.warn(`이미지 로드 실패: ${img.src}`);
+                        status.textContent = `이미지 로딩 중... (${index + 1}/${images.length}) - 일부 실패`;
+                        resolve(); // 에러가 나도 진행
+                      };
+                    }
                   });
-                }));
+                });
+                
+                await Promise.all(loadPromises);
                 
                 console.log('모든 이미지 로드 완료, html2canvas 시작');
                 status.textContent = "캔버스 생성 중...";
@@ -1695,13 +1711,13 @@
                   backgroundColor: '#fff',
                   useCORS: true,
                   allowTaint: true,
-                  logging: true, // 디버깅 정보 출력
+                  logging: false,
+                  imageTimeout: 15000, // ✅ 이미지 타임아웃 15초로 설정
                   onclone: (clonedDoc) => {
                     // 복제된 DOM의 모든 이미지에 crossOrigin 설정
-                    const clonedImages = clonedDoc.querySelectorAll('img');
+                    const clonedImages = clonedDoc.querySelectorAll('#sheet-grid img');
                     clonedImages.forEach(img => {
                       img.crossOrigin = 'anonymous';
-                      // 불투명도는 그대로 유지
                     });
                   }
                 });
@@ -1710,13 +1726,17 @@
                 status.textContent = "이미지 다운로드 중...";
                 
                 // canvas를 데이터 URL로 변환하여 다운로드
-                const dataURL = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = dataURL;
-                a.download = `pocalist_sheet_${Date.now()}.png`;
-                a.click();
+                canvas.toBlob((blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `pocalist_sheet_${Date.now()}.png`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  
+                  overlay.removeChild(status);
+                }, 'image/png');
                 
-                overlay.removeChild(status);
               } catch (e) {
                 console.error('캡처 중 오류 발생:', e);
                 alert('캡처 실패: ' + e.message);
@@ -1726,45 +1746,57 @@
             btnBar.append(closeBtn, saveBtn);
             overlay.appendChild(btnBar);
 
-            // ④ 노드 복제해서 시트에 추가 (이미지 로딩 처리 개선)
-            nodes.forEach(n => {
+            // ④ 노드 복제해서 시트에 추가 - ✅ 이미지 로딩 개선
+            let loadedCount = 0;
+            const totalImages = nodes.length;
+            
+            nodes.forEach((n, index) => {
               const container = document.createElement('div');
-              container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center;';
+              container.style.cssText = 'position:relative; width:100px; height:140px; display:flex; justify-content:center; align-items:center; background:#f5f5f5;';
               
               const img = new Image();
-              img.crossOrigin = 'anonymous'; // CORS 문제 해결을 위해 필수
+              img.crossOrigin = 'anonymous';
               img.className = 'photo-card';
               img.style.cssText = 'max-width:100%; max-height:140px; object-fit:contain;';
               
               // 체크 상태에 따라 불투명도 설정
               if (n.classList.contains('checked')) {
-                img.style.opacity = '1'; // 보유 카드는 100% 불투명도
+                img.style.opacity = '1';
               } else {
-                img.style.opacity = '0.4'; // 미보유 카드는 40% 불투명도
+                img.style.opacity = '0.4';
               }
-              
-              // 원본 소스와 데이터셋 복사
-              img.src = n.src;
-              img.alt = n.alt;
               
               // 로딩 표시기
               const loader = document.createElement('div');
-              loader.textContent = '로딩중...';
-              loader.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.8);';
+              loader.textContent = '...';
+              loader.style.cssText = 'position:absolute; font-size:12px; color:#999;';
               container.appendChild(loader);
               
-              // 이미지 로드 완료 시 로딩 표시기 제거
+              // ✅ 이미지 로드 완료 시 로딩 표시기 제거
               img.onload = () => {
+                loadedCount++;
                 if (loader.parentNode === container) {
                   container.removeChild(loader);
                 }
+                console.log(`이미지 로드 완료: ${loadedCount}/${totalImages}`);
               };
+              
+              img.onerror = () => {
+                loadedCount++;
+                loader.textContent = '✕';
+                loader.style.color = '#e74c3c';
+                console.error(`이미지 로드 실패 (${loadedCount}/${totalImages}):`, n.src);
+              };
+              
+              // ✅ 원본 소스 사용
+              img.src = n.src;
+              img.alt = n.alt;
               
               container.appendChild(img);
               sheetGrid.appendChild(container);
             });
           }
-
+///////////////////////////////////////////////////////////
           // 모달 전체에서 우클릭 메뉴 차단
           $('#photo-modal').addEventListener('contextmenu', e => e.preventDefault());
           
