@@ -1788,8 +1788,16 @@
                 console.error(`이미지 로드 실패 (${loadedCount}/${totalImages}):`, n.src);
               };
               
-              // ✅ 원본 소스 사용
-              img.src = n.src;
+              // ✅ 원본 데이터에서 직접 URL 가져오기
+	  const uniqueId = n.dataset.unique;
+	  const imageData = backupAllImages.find(meta => meta.unique_id == uniqueId);
+	  if (imageData) {
+	    img.src = imageData.url.startsWith('http') 
+	      ? imageData.url 
+	      : `https://pocali-backend.onrender.com${imageData.url}`;
+	  } else {
+	    img.src = n.src;
+	  }
               img.alt = n.alt;
               
               container.appendChild(img);
