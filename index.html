@@ -1223,18 +1223,17 @@
           // 서버에서 데이터 가져오기 (10초마다 폴링)
           async function pollServerData() {
             if (viewOwner !== 'self') return;
-            
+
             const me = await getMyUUID();
             if (!me) return;
-            
+
             try {
               const r = await fetch(`https://pocali-backend.onrender.com/api/user/${me}`);
               if (!r.ok) return;
-              
+
               const data = await r.json();
               let serverData;
-              
-              // 데이터 형식 처리
+
               if (typeof data.data === 'string') {
                 try {
                   serverData = JSON.parse(data.data);
@@ -1244,22 +1243,26 @@
               } else {
                 serverData = data.data || {};
               }
-              
-              userData = serverData;
-              
-              // 모든 저장소에 저장
-              await saveUserData('userData', serverData);
-              
+
+              // ✅ 덮어쓰기 방지 로직
+              if (Object.keys(serverData).length > Object.keys(userData || {}).length) {
+                userData = serverData;
+                await saveUserData('userData', userData);
+              }
+
               photoCards.forEach(img =>
-                img.classList.toggle('checked', !!serverData[img.dataset.unique]));
+                img.classList.toggle('checked', !!userData[img.dataset.unique])
+              );
+
               updateCount();
+
             } catch (error) {
               console.error('서버 데이터 폴링 실패:', error);
             }
           }
           
           // 일정 간격으로 서버 데이터 폴링
-          setInterval(pollServerData, 10000);
+          //setInterval(pollServerData, 10000);
 
           /* ─────────────────────────────────────────────
             5. UI 이벤트 핸들러들
