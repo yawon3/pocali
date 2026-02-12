@@ -883,7 +883,8 @@
             }
             
             setupLoadOtherDataHandler();
-            setupFabButton(); // FAB 버튼 설정 추가
+          // setupFabButton(); // (삭제/미사용) ReferenceError 방지
+// FAB 버튼 설정 추가
 
 
             
@@ -1015,7 +1016,7 @@
           function updateCount() {
             const totalFiltered = allImages.length;
             const checkedCount = allImages.filter(meta => 
-              userData[meta.unique_id]
+              userData[String(meta.unique_id).trim()]
             ).length;
             document.getElementById('count-display').textContent = `${checkedCount} / ${totalFiltered}`;
           }
@@ -1425,7 +1426,7 @@
               img.dataset.version = meta.version;
               
               // 현재 보여지는 데이터 기준으로 체크 상태 설정
-              if (userData[meta.unique_id]) img.classList.add('checked');
+              if (userData[String(meta.unique_id).trim()]) img.classList.add('checked');
               return img;
             });
             
@@ -1686,18 +1687,16 @@
           });
 
           // 초기 로드
-          fetchAndRenderImages()
-            .then(() => {
-              // 초기화가 완료된 후 내 덱 로드
-              setTimeout(() => {
-                loadSelfDeck();
-              }, 100);
-            })
-            .catch(console.error);
-        });
+          (async () => {
+            // ✅ UUID/저장소/서버 동기화가 먼저 끝나야 체크 표시/카운트가 맞음
+            await initAppWithLock();
+            await fetchAndRenderImages();
+            await loadSelfDeck();
+          })().catch(console.error);
+});
 
         // 페이지 로드 시 앱 초기화 (DOMContentLoaded와 별개로 window.onload에도 호출)
-        window.addEventListener('load', initApp);
+        window.addEventListener('load', initAppWithLock);
 
 
         // iOS/iPadOS UUID 문제 해결을 위한 기능
