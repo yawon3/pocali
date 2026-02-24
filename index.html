@@ -1480,7 +1480,9 @@
               const img = document.createElement('img');
               img.className = 'photo-card';
               img.crossOrigin = 'anonymous';
-              img.src = meta.url;
+              img.src = meta.url.startsWith('http')
+              ? meta.url
+              : `https://pocali-backend.onrender.com${meta.url}`;
               img.alt = `${meta.group} ${meta.member} ${meta.category} ${meta.title}`;
               img.dataset.unique = meta.unique_id;
               img.dataset.group = meta.group;
