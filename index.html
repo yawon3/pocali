@@ -559,35 +559,24 @@
               return await ensureMyUUID();
             }
             
-            // userData 확인
-            let userData = await getUserDataObj();
-            if (Object.keys(userData).length === 0) {
-              console.log('userData 누락, 서버에서 데이터 가져오기');
-              try {
-                const response = await fetch(`https://pocali-backend.onrender.com/api/user/${uuid}`);
-                if (response.ok) {
-                  const data = await response.json();
-                  
-                  if (data.data) {
-                    // 데이터 형식에 따라 적절히 처리
-                    let processedData;
-                    if (typeof data.data === 'string') {
-                      try {
-                        processedData = JSON.parse(data.data);
-                      } catch {
-                        processedData = data.data;
-                      }
-                    } else {
-                      processedData = data.data;
-                    }
-                    
-                    // 모든 저장소에 저장
-                    await saveUserData('userData', JSON.stringify(processedData));
-                  }
-                }
-              } catch (error) {
-                console.error('서버에서 userData 조회 실패:', error);
+            // userData 확인 (항상 서버도 한번 확인)
+            let localObj = await getUserDataObj();
+
+            try {
+              const serverObj = await fetchUserDataFromServer(uuid);
+
+              if (serverObj) {
+                const merged = pickNewerUserData(localObj, serverObj);
+
+                // 전역 userData 갱신
+                userData = merged;
+
+                // 로컬 저장소 최신화
+                await saveUserData('userData', merged);
               }
+
+            } catch (e) {
+              console.error('validateUserID 서버 동기화 실패:', e);
             }
             
             return uuid;
@@ -622,6 +611,49 @@
           }
         }
 
+
+        // ✅ 서버에서 userData 가져오기 (공용)
+        async function fetchUserDataFromServer(uuid) {
+          if (!uuid) return null;
+
+          try {
+            const r = await fetch(`https://pocali-backend.onrender.com/api/user/${uuid}`);
+            if (!r.ok) return null;
+
+            const data = await r.json();
+
+            // data.data가 string(JSON)일 수도, object일 수도
+            let serverObj = {};
+            if (typeof data.data === 'string') {
+              try { serverObj = JSON.parse(data.data); } catch { serverObj = {}; }
+            } else {
+              serverObj = data.data || {};
+            }
+
+            return serverObj;
+          } catch (e) {
+            console.error('fetchUserDataFromServer 실패:', e);
+            return null;
+          }
+        }
+
+        // ✅ 로컬 vs 서버 중 “최신” 선택 (타임스탬프 있으면 그걸로, 없으면 키 개수로)
+        function pickNewerUserData(localObj = {}, serverObj = {}) {
+          const lts = Number(localObj.__ts || 0);
+          const sts = Number(serverObj.__ts || 0);
+
+          if (lts && sts) return (sts >= lts) ? serverObj : localObj;
+
+          // 타임스탬프가 없으면 fallback: 체크 개수 많은 쪽 우선
+          const lcount = Object.keys(localObj || {}).length;
+          const scount = Object.keys(serverObj || {}).length;
+          return (scount >= lcount) ? serverObj : localObj;
+        }
+
+
+
+
+
         // load-other-data 핸들러 세팅 (잠금 체크 포함)
         function setupLoadOtherDataHandler() {
           const loadBtn = document.getElementById('load-other-data');
@@ -648,26 +680,44 @@
                 alert('해당 UUID를 찾을 수 없습니다.');
                 return;
               }
-              
               const json = await response.json();
               let userDataObj;
-              
+
               // 데이터 형식 처리
               if (typeof json.data === 'string') {
                 try {
                   userDataObj = JSON.parse(json.data);
                 } catch {
-                  userDataObj = json.data;
+                  userDataObj = {};
                 }
               } else {
                 userDataObj = json.data || {};
               }
-              
-              // 모든 저장소에 저장
+
+              // ✅ 현재 UUID 백업 + 확인창(실수 방지)
+              const currentUUID = await getMyUUID();
+
+              if (currentUUID && currentUUID !== otherUUID) {
+                await saveUserData('myUUID_backup', currentUUID); // 되돌리기용
+              }
+
+              const ok = confirm(
+              `⚠️ UUID 통일(계정 전환)합니다.
+
+              현재 UUID: ${currentUUID || '(없음)'}
+              변경 UUID: ${otherUUID}
+
+              이 UUID로 체크/저장이 진행됩니다. 계속할까요?`
+              );
+
+              if (!ok) return;
+
+              // ✅ 내 UUID를 통일 + userData 저장
               await saveUserData('myUUID', otherUUID);
               await saveUserData('userData', JSON.stringify(userDataObj));
-              
+
               location.reload();
+
             } catch (error) {
               console.error('데이터 로드 오류:', error);
               alert('데이터 로드 중 오류가 발생했습니다.');
@@ -884,7 +934,7 @@
             
             setupLoadOtherDataHandler();
           // setupFabButton(); // (삭제/미사용) ReferenceError 방지
-// FAB 버튼 설정 추가
+          // FAB 버튼 설정 추가
 
 
             
@@ -903,8 +953,6 @@
           1. 초기화 및 메인 기능들
           ─────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', () => {
-          // 앱 초기화
-          initAppWithLock();  // ← initApp()을 initAppWithLock()으로 변경!
           
           // ── export-modal 닫기 핸들러
           const $exportModal      = document.getElementById('export-modal');
@@ -939,6 +987,8 @@
             
             img.classList.toggle('checked');
             
+
+            userData.__ts = Date.now(); // ✅ 추가
             // userData 업데이트
             userData[img.dataset.unique] = img.classList.contains('checked');
             
@@ -963,19 +1013,33 @@
           // ✅ 덱 전환 기능 수정
           /** 내 보유 카드 표시 */
           async function loadSelfDeck() {
-            // 최신 userData 가져오기
-            const myData = await getUserDataObj();
-            userData = myData;
-            
-            photoCards.forEach(img => {
-              img.classList.toggle('checked', !!myData[img.dataset.unique]);
-              img.style.pointerEvents = ''; // 더블클릭 허용
-            });
+          // 1) UUID 확보
+          const uuid = await getMyUUID();
+          if (!uuid) return;
 
-            viewOwner = 'self';
-            $viewToggleBtn.textContent = '👥 친구보기';
-            updateCount();
-          }
+          // 2) 로컬 userData
+          const localData = await getUserDataObj();
+
+          // 3) 서버 userData (✅ 새로 추가한 함수)
+          const serverData = await fetchUserDataFromServer(uuid);
+
+          // 4) 더 최신 선택
+          const merged = pickNewerUserData(localData, serverData || {});
+
+          // 5) 전역 userData 갱신 + 로컬 저장소도 최신으로 덮어쓰기
+          userData = merged;
+          await saveUserData('userData', userData);
+
+          // 6) 화면 반영
+          photoCards.forEach(img => {
+            img.classList.toggle('checked', !!userData[img.dataset.unique]);
+            img.style.pointerEvents = '';
+          });
+
+          viewOwner = 'self';
+          $viewToggleBtn.textContent = '👥 친구보기';
+          updateCount();
+        }
 
           /** 친구 보유 카드 표시 */
           async function loadFriendDeck(uuid) {
@@ -1693,10 +1757,9 @@
             await fetchAndRenderImages();
             await loadSelfDeck();
           })().catch(console.error);
-});
+          });
 
-        // 페이지 로드 시 앱 초기화 (DOMContentLoaded와 별개로 window.onload에도 호출)
-        window.addEventListener('load', initAppWithLock);
+      
 
 
         // iOS/iPadOS UUID 문제 해결을 위한 기능
@@ -2055,44 +2118,7 @@
             }
           });
 
-          // 원래의 validateUserID 함수를 오버라이드하여 URL UUID 처리 개선
-          const originalValidateUserID = window.validateUserID;
-          
-          if (typeof originalValidateUserID === 'function') {
-            window.validateUserID = async function() {
-              // URL에서 UUID 확인 (최우선)
-              const urlUuid = getUuidFromUrl();
-              
-              if (urlUuid) {
-                console.log('validateUserID: URL에서 UUID 사용:', urlUuid);
-                
-                // localStorage와 쿠키에 URL UUID 저장
-                localStorage.setItem('myUUID', urlUuid);
-                setCookie('myUUID', urlUuid, 30);
-                
-                // 서버에서 데이터 확인
-                try {
-                  const resp = await fetch(`https://pocali-backend.onrender.com/api/user/${urlUuid}`);
-                  if (resp.ok) {
-                    const data = await resp.json();
-                    if (data.data) {
-                      const userData = typeof data.data === 'string' ? data.data : JSON.stringify(data.data || {});
-                      localStorage.setItem('userData', userData);
-                      setCookie('userData', userData, 30);
-                    }
-                  }
-                } catch (error) {
-                  console.error('URL UUID 데이터 로드 실패:', error);
-                }
-                
-                return urlUuid;
-              }
-              
-              // URL에 UUID가 없으면 원래 함수 호출
-              return await originalValidateUserID.apply(this, arguments);
-            };
-          }
-          
+    
           // 원래의 ensureMyUUID 함수를 오버라이드하여 URL UUID 처리 개선
           const originalEnsureMyUUID = window.ensureMyUUID;
           
