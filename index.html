@@ -1387,6 +1387,8 @@
           }, 100);
         });
 
+
+
           // ─── 무한 스크롤 트리거 ─────────────────────────
           window.addEventListener('scroll', () => {
             // 이미 렌더링 중이거나 더 이상 로드할 이미지가 없으면 종료
@@ -1758,9 +1760,27 @@
             await initAppWithLock();
             await fetchAndRenderImages();
             await loadSelfDeck();
+            trackEvent('page_view');
           })().catch(console.error);
           });
+          
+          async function trackEvent(eventName) {
+            try {
+              const uuid = await getMyUUID();
+              if (!uuid) return;
 
+              await fetch('https://pocali-backend.onrender.com/api/track', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                  uuid: uuid,
+                  event: eventName
+                })
+              });
+            } catch (e) {
+              // 통계 실패는 앱 동작에 영향 없게 조용히 무시
+            }
+          }
       
 
 
