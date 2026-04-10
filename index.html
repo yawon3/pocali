@@ -100,10 +100,6 @@
                     이서
                 </label>
                 </fieldset>
-                <fieldset>
-                <legend>텍스트 검색</legend>
-                <input type="text" id="filter-text" name="filter-text" placeholder="검색어 입력" />
-                </fieldset>
                 <button type="submit">검색</button>
             </form>
             </div>
@@ -754,7 +750,11 @@
         let viewOwner      = 'self';   // 'self'| 'friend'
         let currentFriendUUID = null;  // 초기화: DOMContentLoaded에서 설정됨
         let userData       = {};       // 현재 보여지는 데이터 (내 것 또는 친구 것)
-        
+        let filters = {
+            text: '',
+            groups: [],
+            members: []
+          };
 
 
         const advancedFilters = { groups: [], members: [] };
@@ -1173,6 +1173,43 @@
             }
           }
 
+          function applyAllFilters() {
+            const q = (filters.text || '').trim().toLowerCase();
+
+            allImages = backupAllImages.filter(meta => {
+              const searchableText = [
+                meta.group || '',
+                meta.member || '',
+                meta.category || '',
+                meta.title || '',
+                meta.version || ''
+              ].join(' ').toLowerCase();
+
+              const textMatch =
+                !q || searchableText.includes(q);
+
+              const groupMatch =
+                filters.groups.length === 0 ||
+                filters.groups.includes(meta.group);
+
+              const memberMatch =
+                filters.members.length === 0 ||
+                filters.members.includes(meta.member);
+
+              return textMatch && groupMatch && memberMatch;
+            });
+
+            currentBatch = 0;
+            isRendering = false;
+            $grid.innerHTML = '';
+            updateCount();
+            renderNextBatch();
+
+            setTimeout(() => {
+              applyFilters();
+            }, 100);
+          }
+
           // ─── 페이징별 렌더링 함수 ─────────────────────────
           function renderNextBatch() {
             if (isRendering) return;
@@ -1371,29 +1408,9 @@
 
           // ✅ 검색 이벤트 핸들러
           $searchInput.addEventListener('input', e => {
-          const q = e.target.value.trim().toLowerCase();
-          if (!q) {
-            allImages = backupAllImages.slice();
-          } else {
-            allImages = backupAllImages.filter(meta =>
-              (`${meta.group} ${meta.member} ${meta.category} ${meta.title}`)
-                .toLowerCase().includes(q)
-            );
-          }
-          // 페이징 초기화 후 다시 렌더
-          currentBatch = 0;
-          isRendering = false;
-          $grid.innerHTML = '';
-          
-          // ✅ 이 줄을 추가하세요
-          updateCount();
-          
-          renderNextBatch();
-          // 첫 배치 렌더링 후 현재 뷰 적용
-          setTimeout(() => {
-            applyFilters();
-          }, 100);
-        });
+            filters.text = e.target.value.trim();
+            applyAllFilters();
+          });
 
 
 
@@ -1445,30 +1462,17 @@
 
           detailForm.addEventListener('submit', e => {
             e.preventDefault();
+
             const fd = new FormData(detailForm);
-            const groups = fd.getAll('group');
-            const members = fd.getAll('member');
-            
-            if (!groups.length && !members.length) {
-              allImages = backupAllImages.slice();
-            } else {
-              allImages = backupAllImages.filter(meta =>
-                (groups.length === 0 || groups.includes(meta.group)) &&
-                (members.length === 0 || members.includes(meta.member))
-              );
-            }
-            
-            currentBatch = 0;
-            isRendering = false;
-            $grid.innerHTML = '';
-            updateCount();
-  
-            renderNextBatch();
-            setTimeout(() => {
-              applyFilters();
-            }, 100);
+
+            filters.groups = fd.getAll('group');
+            filters.members = fd.getAll('member');
+
+            applyAllFilters();
             detailModal.style.display = 'none';
           });
+
+
           // Export form
           const $exportForm = document.getElementById('export-form');
           $exportForm.addEventListener('submit', e => {
