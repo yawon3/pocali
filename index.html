@@ -1191,7 +1191,12 @@
             isRendering = false;
             $grid.innerHTML = '';
             updateCount();
-            renderNextBatch();
+            
+            if (currentView === 'category') {
+              showByCategory();
+            } else {
+              renderNextBatch();
+            }
 
     
           }
