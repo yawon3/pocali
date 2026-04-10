@@ -1460,6 +1460,11 @@
             filters.members = fd.getAll('member');
 
             applyAllFilters();
+            
+            // 🔥 이거 추가
+            if (currentView === 'category') {
+              showByCategory();
+            }
             detailModal.style.display = 'none';
           });
 
