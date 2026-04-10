@@ -1191,14 +1191,12 @@
             isRendering = false;
             $grid.innerHTML = '';
             updateCount();
-            
+
+            renderNextBatch();
+
             if (currentView === 'category') {
               showByCategory();
-            } else {
-              renderNextBatch();
             }
-
-    
           }
 
           // ─── 페이징별 렌더링 함수 ─────────────────────────
@@ -1460,11 +1458,6 @@
             filters.members = fd.getAll('member');
 
             applyAllFilters();
-            
-            // 🔥 이거 추가
-            if (currentView === 'category') {
-              showByCategory();
-            }
             detailModal.style.display = 'none';
           });
 
