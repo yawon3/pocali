@@ -1170,7 +1170,8 @@
                 meta.member || '',
                 meta.category || '',
                 meta.title || '',
-                meta.version || ''
+                meta.version || '',
+                ...(meta.search_keywords || [])
               ].join(' ').toLowerCase();
 
               const textMatch =
